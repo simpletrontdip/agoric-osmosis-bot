@@ -1,0 +1,46 @@
+{
+  "name": "osmosis-arbitrage-bot",
+  "version": "0.0.1",
+  "private": true,
+  "useWorkspaces": true,
+  "workspaces": [
+    "ui",
+    "_agstate/agoric-servers"
+  ],
+  "devDependencies": {
+    "@endo/init": "^0.5.33",
+    "ses": "^0.15.7",
+    "@typescript-eslint/parser": "^4.19.0",
+    "ava": "^3.12.1",
+    "eslint": "^7.23.0",
+    "eslint-config-airbnb": "^18.0.1",
+    "eslint-config-airbnb-base": "^14.0.0",
+    "eslint-config-jessie": "^0.0.6",
+    "eslint-config-prettier": "^8.1.0",
+    "eslint-plugin-import": "^2.20.0",
+    "eslint-plugin-jsdoc": "^32.3.0",
+    "eslint-plugin-jsx-a11y": "^6.2.3",
+    "eslint-plugin-prettier": "^3.1.2",
+    "lerna": "^4.0.0",
+    "nyc": "^15.1.0",
+    "prettier": "^1.18.2",
+    "@agoric/babel-parser": "^7.6.4",
+    "babel-eslint": ">=11.0.0-beta.2",
+    "eslint-plugin-eslint-comments": "^3.1.2",
+    "typescript": "^4.0.3"
+  },
+  "engines": {
+    "node": ">=14.15.0"
+  },
+  "scripts": {
+    "lint-fix": "yarn workspaces run lint-fix",
+    "lint-check": "yarn workspaces run lint-check && (cd ui && yarn lint-check)",
+    "lint": "yarn workspaces run lint-check",
+    "test": "yarn workspaces run test",
+    "build": "yarn workspaces run build"
+  },
+  "prettier": {
+    "trailingComma": "all",
+    "singleQuote": true
+  }
+}
