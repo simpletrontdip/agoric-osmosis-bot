@@ -1,0 +1,59 @@
+{
+  "name": "osmosis-arbitrage-bot-bot",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Arbitrage bot logic",
+  "scripts": {
+    "build": "exit 0",
+    "test": "exit 0",
+    "lint": "eslint '**/*.{js,jsx}'",
+    "lint-fix": "eslint --fix '**/*.{js,jsx}'",
+    "lint-check": "eslint '**/*.{js,jsx}'",
+    "lint-fix-jessie": "eslint -c '.eslintrc-jessie.js' --fix '**/*.{js,jsx}'",
+    "lint-check-jessie": "eslint -c '.eslintrc-jessie.js' '**/*.{js,jsx}'"
+  },
+  "devDependencies": {
+    "@endo/eslint-plugin": "^0.3.10",
+    "@jessie.js/eslint-plugin": "^0.1.3",
+    "agoric": "*",
+    "eslint": "^7.23.0",
+    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-config-jessie": "^0.0.6",
+    "eslint-config-prettier": "^8.1.0",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-jsdoc": "^32.3.0",
+    "eslint-plugin-prettier": "^3.3.1",
+    "prettier": "^2.2.1"
+  },
+  "dependencies": {
+    "@agoric/ertp": "*",
+    "@agoric/eventual-send": "*",
+    "@agoric/far": "*",
+    "@agoric/marshal": "*",
+    "@agoric/notifier": "*",
+    "@agoric/zoe": "*",
+    "@keplr-wallet/common": "0.9.12-rc.3",
+    "@keplr-wallet/cosmos": "0.9.12-rc.3",
+    "@keplr-wallet/crypto": "0.9.12-rc.3",
+    "@keplr-wallet/types": "0.9.12-rc.3",
+    "@keplr-wallet/unit": "0.9.12-rc.3",
+    "axios": "^0.21.0",
+    "dayjs": "^1.10.4"
+  },
+  "eslintConfig": {
+    "extends": [
+      "@agoric"
+    ]
+  },
+  "keywords": [],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Agoric/agoric"
+  },
+  "author": "Agoric",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/Agoric/agoric/issues"
+  },
+  "homepage": "https://github.com/Agoric/agoric#readme"
+}
