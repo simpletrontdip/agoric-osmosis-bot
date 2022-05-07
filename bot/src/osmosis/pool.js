@@ -1,7 +1,7 @@
 "use strict";
 exports.__esModule = true;
 var unit_1 = require("@keplr-wallet/unit");
-var Math = require("./math");
+var Math = require("../math");
 var GAMMPool = /** @class */ (function () {
     function GAMMPool(data) {
         this.data = data;
@@ -166,8 +166,8 @@ var GAMMPool = /** @class */ (function () {
         return Math.calcSlippageSlope(new unit_1.Dec(inPoolAsset.token.amount), new unit_1.Dec(inPoolAsset.weight), new unit_1.Dec(outPoolAsset.weight), this.swapFee);
     };
     GAMMPool.prototype.getPoolAsset = function (denom) {
-        var poolAsset = this.data.poolAssets.find(function (poolAsset) {
-            return poolAsset.token.denom === denom;
+        var poolAsset = this.data.poolAssets.find(function (p) {
+            return p.token.denom === denom;
         });
         if (!poolAsset) {
             throw new Error("pool doesn't have the pool asset for " + denom);

@@ -1,13 +1,12 @@
 "use strict";
 exports.__esModule = true;
 var unit_1 = require("@keplr-wallet/unit");
-var pool_1 = require("./osmosis/pool");
+var pool_1 = require("./pool");
 var data = {
     '@type': '/osmosis.gamm.v1beta1.Pool',
     address: 'osmo1mw0ac6rwlp5r8wapwk3zs6g29h8fcscxqakdzw9emkne6c8wjp9q0t3v8t',
     id: '1',
     poolParams: {
-        lock: false,
         swapFee: '0.003000000000000000',
         exitFee: '0.000000000000000000',
         smoothWeightChangeParams: null

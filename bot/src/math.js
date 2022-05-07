@@ -56,14 +56,14 @@ function calcSingleInGivenPoolOut(tokenBalanceIn, tokenWeightIn, poolSupply, tot
     var normalizedWeight = tokenWeightIn.quo(totalWeight);
     var newPoolSupply = poolSupply.add(poolAmountOut);
     var poolRatio = newPoolSupply.quo(poolSupply);
-    //uint newBalTi = poolRatio^(1/weightTi) * balTi;
+    // uint newBalTi = poolRatio^(1/weightTi) * balTi;
     var boo = oneDec.quo(normalizedWeight);
     var tokenInRatio = pow(poolRatio, boo);
     var newTokenBalanceIn = tokenInRatio.mul(tokenBalanceIn);
     var tokenAmountInAfterFee = newTokenBalanceIn.sub(tokenBalanceIn);
     // Do reverse order of fees charged in joinswap_ExternAmountIn, this way
     //     ``` pAo == joinswap_ExternAmountIn(Ti, joinswap_PoolAmountOut(pAo, Ti)) ```
-    //uint tAi = tAiAfterFee / (1 - (1-weightTi) * swapFee) ;
+    // uint tAi = tAiAfterFee / (1 - (1-weightTi) * swapFee) ;
     var zar = oneDec.sub(normalizedWeight).mul(swapFee);
     return tokenAmountInAfterFee.quo(oneDec.sub(zar));
 }
@@ -80,7 +80,7 @@ function calcSingleOutGivenPoolIn(tokenBalanceOut, tokenWeightOut, poolSupply, t
     var newTokenBalanceOut = tokenOutRatio.mul(tokenBalanceOut);
     var tokenAmountOutBeforeSwapFee = tokenBalanceOut.sub(newTokenBalanceOut);
     // charge swap fee on the output token side
-    //uint tAo = tAoBeforeSwapFee * (1 - (1-weightTo) * swapFee)
+    // uint tAo = tAoBeforeSwapFee * (1 - (1-weightTo) * swapFee)
     var zaz = oneDec.sub(normalizedWeight).mul(swapFee);
     return tokenAmountOutBeforeSwapFee.mul(oneDec.sub(zaz));
 }
@@ -88,13 +88,13 @@ exports.calcSingleOutGivenPoolIn = calcSingleOutGivenPoolIn;
 function calcPoolInGivenSingleOut(tokenBalanceOut, tokenWeightOut, poolSupply, totalWeight, tokenAmountOut, swapFee) {
     // charge swap fee on the output token side
     var normalizedWeight = tokenWeightOut.quo(totalWeight);
-    //uint tAoBeforeSwapFee = tAo / (1 - (1-weightTo) * swapFee) ;
+    // uint tAoBeforeSwapFee = tAo / (1 - (1-weightTo) * swapFee) ;
     var zoo = oneDec.sub(normalizedWeight);
     var zar = zoo.mul(swapFee);
     var tokenAmountOutBeforeSwapFee = tokenAmountOut.quo(oneDec.sub(zar));
     var newTokenBalanceOut = tokenBalanceOut.sub(tokenAmountOutBeforeSwapFee);
     var tokenOutRatio = newTokenBalanceOut.quo(tokenBalanceOut);
-    //uint newPoolSupply = (ratioTo ^ weightTo) * poolSupply;
+    // uint newPoolSupply = (ratioTo ^ weightTo) * poolSupply;
     var poolRatio = pow(tokenOutRatio, normalizedWeight);
     var newPoolSupply = poolRatio.mul(poolSupply);
     var poolAmountInAfterExitFee = poolSupply.sub(newPoolSupply);

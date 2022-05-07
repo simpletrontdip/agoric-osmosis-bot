@@ -1,5 +1,5 @@
 import { Int } from '@keplr-wallet/unit';
-import { GAMMPool } from './osmosis/pool';
+import { GAMMPool } from './pool';
 
 const data = {
   '@type': '/osmosis.gamm.v1beta1.Pool',

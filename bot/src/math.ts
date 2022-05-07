@@ -1,3 +1,4 @@
+/* eslint-disable no-use-before-define */
 import { Dec, Int } from '@keplr-wallet/unit';
 
 const powPrecision = new Dec('0.00000001');
@@ -235,6 +236,7 @@ export function powApprox(base: Dec, exp: Dec, precision: Dec): Dec {
   let negative = false;
 
   // TODO: Document this computation via taylor expansion
+  // eslint-disable-next-line no-plusplus
   for (let i = 1; term.gte(precision); i++) {
     const bigK = oneDec.mul(new Dec(i.toString()));
     const [c, cneg] = absDifferenceWithSign(a, bigK.sub(oneDec));

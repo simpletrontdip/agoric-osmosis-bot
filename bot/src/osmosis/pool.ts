@@ -1,6 +1,6 @@
 import { Coin, Dec, Int } from '@keplr-wallet/unit';
 import { GAMMPoolData } from './types';
-import * as Math from './math';
+import * as Math from '../math';
 
 export class GAMMPool {
   static calculateSlippageTokenIn(
