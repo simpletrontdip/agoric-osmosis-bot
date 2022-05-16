@@ -1,8 +1,10 @@
 import { E } from '@agoric/eventual-send';
 import { Far } from '@agoric/marshal';
-import { Dec } from '@keplr-wallet/unit';
+import * as unit from '@keplr-wallet/unit';
 
 import { calcSpotPrice } from './math';
+
+const { Dec } = unit;
 
 // from the code
 const SUCCESS_OFFER_MSG = 'Swap successfully completed.';
@@ -55,8 +57,8 @@ const makeAgoricFund = ({
     },
     async cleanup() {
       return Promise.all([
-        E(centralDepositFacetP).deposit(centralFund),
-        E(secondaryDepositFacetP).deposit(secondaryFund),
+        E(centralDepositFacetP).receive(centralFund),
+        E(secondaryDepositFacetP).receive(secondaryFund),
       ]);
     },
   });
@@ -78,22 +80,41 @@ const makeAgoricPool = ({
       return secondaryBrand;
     },
     async getSpotPrice() {
+      console.log('Agoric pool, getting spot price');
       const allocation = await E(ammAPI).getPoolAllocation(secondaryBrand);
       const centralAmount = allocation.Central;
       const secondaryAmount = allocation.Secondary;
+      console.log(
+        'Here ====>',
+        centralAmount.value,
+        secondaryAmount.value,
+        ammTerms.poolFeeBP,
+        ammTerms.protocolFeeBP,
+        Dec,
+      );
 
       const oneDec = new Dec(1);
+      console.log(
+        'After ====>',
+        oneDec,
+        ammTerms.poolFeeBP + ammTerms.protocolFeeBP,
+        new Dec(ammTerms.poolFeeBP + ammTerms.protocolFeeBP).mul(new Dec(1)),
+      );
       const swapFeeDec = new Dec(
         ammTerms.poolFeeBP + ammTerms.protocolFeeBP,
       ).quo(new Dec(10_000n));
 
-      return calcSpotPrice(
+      const x = calcSpotPrice(
         new Dec(centralAmount.value),
         oneDec,
         new Dec(secondaryAmount.value),
         oneDec,
         swapFeeDec,
       );
+
+      console.log('Spot price ====>', x);
+
+      return x;
     },
     async trade(swapInAmount, expectedReturn) {
       const proposal = harden({

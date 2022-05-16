@@ -6,22 +6,22 @@ import { AmountMath } from '@agoric/ertp';
 import { E } from '@agoric/eventual-send';
 
 import '@agoric/zoe/exported.js';
-import { makeAgoricFund, makeAgoricPool } from './src/agoric';
 
 const arbitrage = harden({
   agoric: {
     fund: {
       Central: {
-        purse: 'Bot BLD Purse',
-        amount: 10_000_000n,
+        purse: 'RUN to arbitrage',
+        amount: 1_000n,
       },
       Secondary: {
-        purse: 'Bot ATOM Purse',
-        ammount: 1_000_000n,
+        purse: 'ATOM to arbitrage',
+        ammount: 1_000n,
       },
     },
     pool: {
       keyword: 'ATOM',
+      name: 'ATOM/USDC',
     },
   },
   osmosis: {
@@ -59,7 +59,7 @@ export default async function deployApi(
   const home = await homePromise;
 
   // Unpack the references.
-  const { zoe, board, wallet, spawner } = home;
+  const { zoe, board, wallet, chainTimerService, spawner } = home;
 
   const poolKeyword = arbitrage.agoric.pool.keyword;
 
@@ -91,11 +91,11 @@ export default async function deployApi(
   const centralDepositFacetP = E(centralPurseP).getDepositFacet();
   const secondaryDepositFacetP = E(secondaryPurseP).getDepositFacet();
 
-  const configs = await E(walletAdminP).getAgoricNames(
+  const arbitrages = await E(walletAdminP).getAgoricNames(
     'uiConfig',
     'VaultFactory',
   );
-  const instance = await E(board).getValue(configs.AMM_INSTANCE_BOARD_ID);
+  const instance = await E(board).getValue(arbitrages.AMM_INSTANCE_BOARD_ID);
   const [ammAPI, ammTerms] = await Promise.all([
     E(zoe).getPublicFacet(instance),
     E(zoe).getTerms(instance),
@@ -119,36 +119,21 @@ export default async function deployApi(
   const centralPayment = await E(centralPurseP).withdraw(centralAmount);
   const secondaryPayment = await E(secondaryPurseP).withdraw(secondaryAmount);
 
-  const agoricFund = makeAgoricFund({
-    centralBrand,
-    // secondaryBrand,
-    centralIssuer,
-    secondaryIssuer,
-    centralPayment,
-    centralDepositFacetP,
-    secondaryPayment,
-    secondaryDepositFacetP,
-  });
-  const agoricPool = makeAgoricPool({
-    zoe,
-    ammAPI,
-    ammTerms,
-    centralBrand,
-    secondaryBrand,
-    fund: agoricFund,
-  });
-
   // Install it on the spawner
   const installation = E(spawner).install(bundle);
 
   // Spawn the function
-  const result = await E(installation).spawn({
-    // osmosisClient,
-    agoricPool,
-    agoricFund,
+  await E(installation).spawn({
     ammAPI,
     ammTerms,
+    centralBrand,
+    secondaryBrand,
+    centralIssuer,
+    secondaryIssuer,
+    centralPayment,
+    secondaryPayment,
+    centralDepositFacetP,
+    secondaryDepositFacetP,
+    timeAuthority: chainTimerService,
   });
-
-  console.log('Result here', result);
 }

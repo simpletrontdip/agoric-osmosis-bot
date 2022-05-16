@@ -1,16 +1,34 @@
 import { E } from '@agoric/eventual-send';
 import { Far } from '@agoric/marshal';
 import { AmountMath } from '@agoric/ertp';
-import { Dec } from '@keplr-wallet/unit';
+import * as unit from '@keplr-wallet/unit';
+
+import { makeAgoricFund, makeAgoricPool } from './agoric.mjs';
+
+const { Dec } = unit;
 
 const startBot = async ({
-  osmosisPool,
-  agoricPool,
-  agoricFund,
   timeAuthority,
-  checkInterval = 5n,
+  checkInterval = 15n,
   maxRunCount = 2,
+  ...args
 }) => {
+  const osmosisPool = Far('Osmosis pool', {
+    getSpotPrice() {
+      return Promise.resolve(new Dec(12.3));
+    },
+  });
+
+  const agoricFund = await makeAgoricFund(args);
+  const agoricPool = await makeAgoricPool({
+    ...args,
+    fund: agoricFund,
+  });
+
+  assert(osmosisPool, 'Osmosis pool is required');
+  assert(agoricPool, 'Agoric pool is required');
+  assert(agoricFund, 'Agoric Fund is required');
+
   const centralBrand = await E(agoricPool).getCentralBrand();
   const secondaryBrand = await E(agoricPool).getSecondaryBrand();
 
@@ -55,7 +73,7 @@ const startBot = async ({
    * }}
    */
   const calculateTradeAmount = async (refPrice, currentPrice) => {
-    if (!isEligibleForTrading) {
+    if (!isEligibleForTrading(refPrice, currentPrice)) {
       return {
         shouldTrade: false,
       };
@@ -83,10 +101,14 @@ const startBot = async ({
   };
 
   const checkAndActOnPriceChanges = async () => {
+    console.log('Checking the price...');
+
     const [refPrice, currentPrice] = await Promise.all([
       E(osmosisPool).getSpotPrice(),
       E(agoricPool).getSpotPrice(),
     ]);
+
+    console.log('Price here====>', refPrice, currentPrice);
 
     const { shouldTrade, swapInAmount, expectedReturn } =
       await calculateTradeAmount(refPrice, currentPrice);
@@ -97,14 +119,12 @@ const startBot = async ({
     }
 
     const success = await doTradeOnAgoric(swapInAmount, expectedReturn);
+    const newPrice = await E(agoricPool).getSpotPrice();
 
     if (success) {
-      console.log('Trade succeeded, new price', agoricPool.getSpotPrice());
+      console.log('Trade succeeded, new price', newPrice);
     } else {
-      console.log(
-        'Trade failed, bc of price change',
-        agoricPool.getSpotPrice(),
-      );
+      console.log('Trade failed, bc of price change', newPrice);
     }
   };
 
@@ -142,7 +162,9 @@ const startBot = async ({
       });
   };
 
+  console.log('Starting the bot');
   await registerNextWakeupCheck();
+  console.log('Done');
 };
 
 harden(startBot);
