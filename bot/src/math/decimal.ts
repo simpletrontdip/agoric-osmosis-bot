@@ -1,12 +1,13 @@
 import bigInteger from 'big-integer';
 import { Int } from './int';
 
+// Avoid being frozen when being a class member
+const DecPrecisionMultipliers: {
+  [key: string]: bigInteger.BigInteger | undefined;
+} = {};
+
 export class Dec {
   public static readonly precision: bigInteger.BigInteger = bigInteger(18);
-
-  private static readonly precisionMultipliers: {
-    [key: string]: bigInteger.BigInteger | undefined;
-  } = {};
 
   private static calcPrecisionMultiplier(
     prec: bigInteger.BigInteger,
@@ -17,13 +18,13 @@ export class Dec {
     if (prec.gt(Dec.precision)) {
       throw new Error('Too much precision');
     }
-    if (Dec.precisionMultipliers[prec.toString()]) {
-      return Dec.precisionMultipliers[prec.toString()]!;
+    if (DecPrecisionMultipliers[prec.toString()]) {
+      return DecPrecisionMultipliers[prec.toString()]!;
     }
 
     const zerosToAdd = Dec.precision.minus(prec);
     const multiplier = bigInteger(10).pow(zerosToAdd);
-    Dec.precisionMultipliers[prec.toString()] = multiplier;
+    DecPrecisionMultipliers[prec.toString()] = multiplier;
     return multiplier;
   }
 

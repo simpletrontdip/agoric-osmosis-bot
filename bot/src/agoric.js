@@ -6,6 +6,7 @@ import { calcSpotPrice } from './math';
 
 // from the code
 const SUCCESS_OFFER_MSG = 'Swap successfully completed.';
+const BP_PRECISIONS = 4;
 
 const makeAgoricFund = ({
   centralBrand,
@@ -87,7 +88,8 @@ const makeAgoricPool = ({
 
       const swapFeeDec = new Dec(
         ammTerms.poolFeeBP + ammTerms.protocolFeeBP,
-      ).quo(new Dec(10_000n));
+        BP_PRECISIONS,
+      );
 
       return calcSpotPrice(
         new Dec(centralAmount.value),

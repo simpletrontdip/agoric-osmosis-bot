@@ -5,18 +5,21 @@ import { AmountMath } from '@agoric/ertp';
 import { Dec } from './math/decimal';
 import { makeAgoricFund, makeAgoricPool } from './agoric.js';
 
+const makeOsmosisPool = () => {
+  return Far('Osmosis pool', {
+    getSpotPrice() {
+      return new Dec(325n, 1);
+    },
+  });
+};
+
 const startBot = async ({
   timeAuthority,
   checkInterval = 15n,
   maxRunCount = 2,
   ...args
 }) => {
-  const osmosisPool = Far('Osmosis pool', {
-    getSpotPrice() {
-      return Promise.resolve(new Dec(12.3));
-    },
-  });
-
+  const osmosisPool = makeOsmosisPool(args);
   const agoricFund = await makeAgoricFund(args);
   const agoricPool = await makeAgoricPool({
     ...args,
@@ -106,13 +109,18 @@ const startBot = async ({
       E(agoricPool).getSpotPrice(),
     ]);
 
-    console.log('Price here====>', refPrice, currentPrice);
+    console.log(
+      'Price here====>',
+      refPrice.toString(),
+      currentPrice.toString(),
+    );
 
     const { shouldTrade, swapInAmount, expectedReturn } =
       await calculateTradeAmount(refPrice, currentPrice);
 
     if (!shouldTrade) {
       // do nothing here
+      console.log('Price diff is not worth trading, ignoring...');
       return;
     }
 
@@ -161,7 +169,8 @@ const startBot = async ({
   };
 
   console.log('Starting the bot');
-  await registerNextWakeupCheck();
+  // await registerNextWakeupCheck();
+  await checkAndActOnPriceChanges();
   console.log('Done');
 };
 

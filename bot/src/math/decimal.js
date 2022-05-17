@@ -1,6 +1,7 @@
 import bigInteger from 'big-integer';
 import { Int } from './int';
 
+const DecPrecisionMultipliers = {};
 export class Dec {
   /**
    * Create a new Dec from integer with decimal place at prec
@@ -41,12 +42,12 @@ export class Dec {
     if (prec.gt(Dec.precision)) {
       throw new Error('Too much precision');
     }
-    if (Dec.precisionMultipliers[prec.toString()]) {
-      return Dec.precisionMultipliers[prec.toString()];
+    if (DecPrecisionMultipliers[prec.toString()]) {
+      return DecPrecisionMultipliers[prec.toString()];
     }
     const zerosToAdd = Dec.precision.minus(prec);
     const multiplier = bigInteger(10).pow(zerosToAdd);
-    Dec.precisionMultipliers[prec.toString()] = multiplier;
+    DecPrecisionMultipliers[prec.toString()] = multiplier;
     return multiplier;
   }
 
@@ -272,4 +273,3 @@ export class Dec {
   }
 }
 Dec.precision = bigInteger(18);
-Dec.precisionMultipliers = {};
