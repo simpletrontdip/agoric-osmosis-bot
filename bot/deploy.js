@@ -77,7 +77,7 @@ export default async function deployApi(
   // }).catch((e) => console.error(`${e}`));
 
   // Bundle up the handler code
-  const bundle = await bundleSource(pathResolve('./src/bot.mjs'));
+  const bundle = await bundleSource(pathResolve('./src/bot.js'));
 
   const walletAdminP = E(wallet).getAdminFacet();
 

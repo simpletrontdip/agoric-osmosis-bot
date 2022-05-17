@@ -1,11 +1,9 @@
 import { E } from '@agoric/eventual-send';
 import { Far } from '@agoric/marshal';
 import { AmountMath } from '@agoric/ertp';
-import * as unit from '@keplr-wallet/unit';
 
-import { makeAgoricFund, makeAgoricPool } from './agoric.mjs';
-
-const { Dec } = unit;
+import { Dec } from './math/decimal';
+import { makeAgoricFund, makeAgoricPool } from './agoric.js';
 
 const startBot = async ({
   timeAuthority,

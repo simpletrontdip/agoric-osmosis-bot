@@ -1,179 +1,245 @@
-"use strict";
-exports.__esModule = true;
-var unit_1 = require("@keplr-wallet/unit");
-var Math = require("../math");
-var GAMMPool = /** @class */ (function () {
-    function GAMMPool(data) {
-        this.data = data;
-        this.data = data;
+/* eslint-disable max-classes-per-file */
+import * as Math from '../math';
+import { Int } from '../math/int';
+import { Dec } from '../math/decimal';
+
+export class Coin {
+  constructor(denom, amount) {
+    this.denom = denom;
+    this.amount = amount instanceof Int ? amount : new Int(amount);
+  }
+
+  static parse(str) {
+    const re = new RegExp('([0-9]+)[ ]*([a-zA-Z]+)');
+    const execed = re.exec(str);
+    if (!execed || execed.length !== 3) {
+      throw new Error('Invalid coin str');
     }
-    GAMMPool.calculateSlippageTokenIn = function (spotPriceBefore, tokenIn, slippage) {
-        var effectivePrice = spotPriceBefore.mul(slippage.add(new unit_1.Dec(1)));
-        return new unit_1.Dec(tokenIn).quo(effectivePrice).truncate();
+    const denom = execed[2];
+    const amount = execed[1];
+    return new Coin(denom, amount);
+  }
+
+  toString() {
+    return `${this.amount.toString()}${this.denom}`;
+  }
+}
+export class GAMMPool {
+  constructor(data) {
+    this.data = data;
+  }
+
+  static calculateSlippageTokenIn(spotPriceBefore, tokenIn, slippage) {
+    const effectivePrice = spotPriceBefore.mul(slippage.add(new Dec(1)));
+    return new Dec(tokenIn).quo(effectivePrice).truncate();
+  }
+
+  static calculateSlippageTokenOut(spotPriceBefore, tokenOut, slippage) {
+    const effectivePrice = spotPriceBefore.mul(slippage.add(new Dec(1)));
+    return new Dec(tokenOut).mul(effectivePrice).truncate();
+  }
+
+  get poolParamsRaw() {
+    return this.data.poolParams;
+  }
+
+  get id() {
+    return this.data.id;
+  }
+
+  get totalWeight() {
+    return new Int(this.data.totalWeight);
+  }
+
+  get shareDenom() {
+    return this.data.totalShares.denom;
+  }
+
+  get swapFee() {
+    return new Dec(this.data.poolParams.swapFee);
+  }
+
+  get exitFee() {
+    return new Dec(this.data.poolParams.exitFee);
+  }
+
+  get totalShare() {
+    return new Int(this.data.totalShares.amount);
+  }
+
+  get poolAssets() {
+    return this.data.poolAssets;
+  }
+
+  estimateJoinPool(shareOutAmount) {
+    const tokenIns = [];
+    const totalShare = this.totalShare;
+    const shareRatio = new Dec(shareOutAmount).quo(new Dec(totalShare));
+    if (shareRatio.lte(new Dec(0))) {
+      throw new Error('share ratio is zero or negative');
+    }
+    for (const poolAsset of this.data.poolAssets) {
+      const tokenInAmount = shareRatio
+        .mul(new Dec(poolAsset.token.amount))
+        .truncate();
+      tokenIns.push(new Coin(poolAsset.token.denom, tokenInAmount));
+    }
+    return {
+      tokenIns,
     };
-    GAMMPool.calculateSlippageTokenOut = function (spotPriceBefore, tokenOut, slippage) {
-        var effectivePrice = spotPriceBefore.mul(slippage.add(new unit_1.Dec(1)));
-        return new unit_1.Dec(tokenOut).mul(effectivePrice).truncate();
+  }
+
+  estimateJoinSwapExternAmountIn(tokenIn) {
+    const poolAsset = this.getPoolAsset(tokenIn.denom);
+    const shareOutAmount = Math.calcPoolOutGivenSingleIn(
+      new Dec(poolAsset.token.amount),
+      new Dec(poolAsset.weight),
+      new Dec(this.totalShare),
+      new Dec(this.totalWeight),
+      new Dec(tokenIn.amount),
+      this.swapFee,
+    ).truncate();
+    return {
+      shareOutAmount,
     };
-    Object.defineProperty(GAMMPool.prototype, "poolParamsRaw", {
-        get: function () {
-            return this.data.poolParams;
-        },
-        enumerable: true,
-        configurable: true
+  }
+
+  estimateExitPool(shareInAmount) {
+    const tokenOuts = [];
+    const totalShare = this.totalShare;
+    const shareRatio = new Dec(shareInAmount).quo(new Dec(totalShare));
+    if (shareRatio.lte(new Dec(0))) {
+      throw new Error('share ratio is zero or negative');
+    }
+    for (const poolAsset of this.data.poolAssets) {
+      const tokenOutAmount = shareRatio
+        .mul(new Dec(poolAsset.token.amount))
+        .truncate();
+      tokenOuts.push(new Coin(poolAsset.token.denom, tokenOutAmount));
+    }
+    return {
+      tokenOuts,
+    };
+  }
+
+  estimateSwapExactAmountIn(tokenIn, tokenOutDenom) {
+    const inPoolAsset = this.getPoolAsset(tokenIn.denom);
+    const outPoolAsset = this.getPoolAsset(tokenOutDenom);
+    const spotPriceBefore = Math.calcSpotPrice(
+      new Dec(inPoolAsset.token.amount),
+      new Dec(inPoolAsset.weight),
+      new Dec(outPoolAsset.token.amount),
+      new Dec(outPoolAsset.weight),
+      this.swapFee,
+    );
+    const tokenOutAmount = Math.calcOutGivenIn(
+      new Dec(inPoolAsset.token.amount),
+      new Dec(inPoolAsset.weight),
+      new Dec(outPoolAsset.token.amount),
+      new Dec(outPoolAsset.weight),
+      new Dec(tokenIn.amount),
+      this.swapFee,
+    ).truncate();
+    const spotPriceAfter = Math.calcSpotPrice(
+      new Dec(inPoolAsset.token.amount).add(new Dec(tokenIn.amount)),
+      new Dec(inPoolAsset.weight),
+      new Dec(outPoolAsset.token.amount).sub(new Dec(tokenOutAmount)),
+      new Dec(outPoolAsset.weight),
+      this.swapFee,
+    );
+    if (spotPriceAfter.lt(spotPriceBefore)) {
+      throw new Error("spot price can't be decreased after swap");
+    }
+    const effectivePrice = new Dec(tokenIn.amount).quo(new Dec(tokenOutAmount));
+    const slippage = effectivePrice.quo(spotPriceBefore).sub(new Dec('1'));
+    return {
+      tokenOutAmount,
+      spotPriceBefore,
+      spotPriceAfter,
+      slippage,
+    };
+  }
+
+  estimateSwapExactAmountOut(tokenInDenom, tokenOut) {
+    const inPoolAsset = this.getPoolAsset(tokenInDenom);
+    const outPoolAsset = this.getPoolAsset(tokenOut.denom);
+    const spotPriceBefore = Math.calcSpotPrice(
+      new Dec(inPoolAsset.token.amount),
+      new Dec(inPoolAsset.weight),
+      new Dec(outPoolAsset.token.amount),
+      new Dec(outPoolAsset.weight),
+      this.swapFee,
+    );
+    const tokenInAmount = Math.calcInGivenOut(
+      new Dec(inPoolAsset.token.amount),
+      new Dec(inPoolAsset.weight),
+      new Dec(outPoolAsset.token.amount),
+      new Dec(outPoolAsset.weight),
+      new Dec(tokenOut.amount),
+      this.swapFee,
+    ).truncate();
+    const spotPriceAfter = Math.calcSpotPrice(
+      new Dec(inPoolAsset.token.amount).add(new Dec(tokenInAmount)),
+      new Dec(inPoolAsset.weight),
+      new Dec(outPoolAsset.token.amount).sub(new Dec(tokenOut.amount)),
+      new Dec(outPoolAsset.weight),
+      this.swapFee,
+    );
+    if (spotPriceAfter.lt(spotPriceBefore)) {
+      throw new Error("spot price can't be decreased after swap");
+    }
+    const effectivePrice = new Dec(tokenInAmount).quo(new Dec(tokenOut.amount));
+    const slippage = effectivePrice.quo(spotPriceBefore).sub(new Dec('1'));
+    return {
+      tokenInAmount,
+      spotPriceBefore,
+      spotPriceAfter,
+      slippage,
+    };
+  }
+
+  calculateSpotPrice(inDenom, outDenom) {
+    const inPoolAsset = this.getPoolAsset(inDenom);
+    const outPoolAsset = this.getPoolAsset(outDenom);
+    return Math.calcSpotPrice(
+      new Dec(inPoolAsset.token.amount),
+      new Dec(inPoolAsset.weight),
+      new Dec(outPoolAsset.token.amount),
+      new Dec(outPoolAsset.weight),
+      new Dec(this.data.poolParams.swapFee),
+    );
+  }
+
+  calculateSpotPriceWithoutSwapFee(inDenom, outDenom) {
+    const inPoolAsset = this.getPoolAsset(inDenom);
+    const outPoolAsset = this.getPoolAsset(outDenom);
+    return Math.calcSpotPrice(
+      new Dec(inPoolAsset.token.amount),
+      new Dec(inPoolAsset.weight),
+      new Dec(outPoolAsset.token.amount),
+      new Dec(outPoolAsset.weight),
+      new Dec(0),
+    );
+  }
+
+  calculateSlippageSlope(inDenom, outDenom) {
+    const inPoolAsset = this.getPoolAsset(inDenom);
+    const outPoolAsset = this.getPoolAsset(outDenom);
+    return Math.calcSlippageSlope(
+      new Dec(inPoolAsset.token.amount),
+      new Dec(inPoolAsset.weight),
+      new Dec(outPoolAsset.weight),
+      this.swapFee,
+    );
+  }
+
+  getPoolAsset(denom) {
+    const poolAsset = this.data.poolAssets.find((p) => {
+      return p.token.denom === denom;
     });
-    Object.defineProperty(GAMMPool.prototype, "id", {
-        get: function () {
-            return this.data.id;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(GAMMPool.prototype, "totalWeight", {
-        get: function () {
-            return new unit_1.Int(this.data.totalWeight);
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(GAMMPool.prototype, "shareDenom", {
-        get: function () {
-            return this.data.totalShares.denom;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(GAMMPool.prototype, "swapFee", {
-        get: function () {
-            return new unit_1.Dec(this.data.poolParams.swapFee);
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(GAMMPool.prototype, "exitFee", {
-        get: function () {
-            return new unit_1.Dec(this.data.poolParams.exitFee);
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(GAMMPool.prototype, "totalShare", {
-        get: function () {
-            return new unit_1.Int(this.data.totalShares.amount);
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(GAMMPool.prototype, "poolAssets", {
-        get: function () {
-            return this.data.poolAssets;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    GAMMPool.prototype.estimateJoinPool = function (shareOutAmount) {
-        var tokenIns = [];
-        var totalShare = this.totalShare;
-        var shareRatio = new unit_1.Dec(shareOutAmount).quo(new unit_1.Dec(totalShare));
-        if (shareRatio.lte(new unit_1.Dec(0))) {
-            throw new Error('share ratio is zero or negative');
-        }
-        for (var _i = 0, _a = this.data.poolAssets; _i < _a.length; _i++) {
-            var poolAsset = _a[_i];
-            var tokenInAmount = shareRatio
-                .mul(new unit_1.Dec(poolAsset.token.amount))
-                .truncate();
-            tokenIns.push(new unit_1.Coin(poolAsset.token.denom, tokenInAmount));
-        }
-        return {
-            tokenIns: tokenIns
-        };
-    };
-    GAMMPool.prototype.estimateJoinSwapExternAmountIn = function (tokenIn) {
-        var poolAsset = this.getPoolAsset(tokenIn.denom);
-        var shareOutAmount = Math.calcPoolOutGivenSingleIn(new unit_1.Dec(poolAsset.token.amount), new unit_1.Dec(poolAsset.weight), new unit_1.Dec(this.totalShare), new unit_1.Dec(this.totalWeight), tokenIn.amount.toDec(), this.swapFee).truncate();
-        return {
-            shareOutAmount: shareOutAmount
-        };
-    };
-    GAMMPool.prototype.estimateExitPool = function (shareInAmount) {
-        var tokenOuts = [];
-        var totalShare = this.totalShare;
-        var shareRatio = new unit_1.Dec(shareInAmount).quo(new unit_1.Dec(totalShare));
-        if (shareRatio.lte(new unit_1.Dec(0))) {
-            throw new Error('share ratio is zero or negative');
-        }
-        for (var _i = 0, _a = this.data.poolAssets; _i < _a.length; _i++) {
-            var poolAsset = _a[_i];
-            var tokenOutAmount = shareRatio
-                .mul(new unit_1.Dec(poolAsset.token.amount))
-                .truncate();
-            tokenOuts.push(new unit_1.Coin(poolAsset.token.denom, tokenOutAmount));
-        }
-        return {
-            tokenOuts: tokenOuts
-        };
-    };
-    GAMMPool.prototype.estimateSwapExactAmountIn = function (tokenIn, tokenOutDenom) {
-        var inPoolAsset = this.getPoolAsset(tokenIn.denom);
-        var outPoolAsset = this.getPoolAsset(tokenOutDenom);
-        var spotPriceBefore = Math.calcSpotPrice(new unit_1.Dec(inPoolAsset.token.amount), new unit_1.Dec(inPoolAsset.weight), new unit_1.Dec(outPoolAsset.token.amount), new unit_1.Dec(outPoolAsset.weight), this.swapFee);
-        var tokenOutAmount = Math.calcOutGivenIn(new unit_1.Dec(inPoolAsset.token.amount), new unit_1.Dec(inPoolAsset.weight), new unit_1.Dec(outPoolAsset.token.amount), new unit_1.Dec(outPoolAsset.weight), new unit_1.Dec(tokenIn.amount), this.swapFee).truncate();
-        var spotPriceAfter = Math.calcSpotPrice(new unit_1.Dec(inPoolAsset.token.amount).add(new unit_1.Dec(tokenIn.amount)), new unit_1.Dec(inPoolAsset.weight), new unit_1.Dec(outPoolAsset.token.amount).sub(new unit_1.Dec(tokenOutAmount)), new unit_1.Dec(outPoolAsset.weight), this.swapFee);
-        if (spotPriceAfter.lt(spotPriceBefore)) {
-            throw new Error("spot price can't be decreased after swap");
-        }
-        var effectivePrice = new unit_1.Dec(tokenIn.amount).quo(new unit_1.Dec(tokenOutAmount));
-        var slippage = effectivePrice.quo(spotPriceBefore).sub(new unit_1.Dec('1'));
-        return {
-            tokenOutAmount: tokenOutAmount,
-            spotPriceBefore: spotPriceBefore,
-            spotPriceAfter: spotPriceAfter,
-            slippage: slippage
-        };
-    };
-    GAMMPool.prototype.estimateSwapExactAmountOut = function (tokenInDenom, tokenOut) {
-        var inPoolAsset = this.getPoolAsset(tokenInDenom);
-        var outPoolAsset = this.getPoolAsset(tokenOut.denom);
-        var spotPriceBefore = Math.calcSpotPrice(new unit_1.Dec(inPoolAsset.token.amount), new unit_1.Dec(inPoolAsset.weight), new unit_1.Dec(outPoolAsset.token.amount), new unit_1.Dec(outPoolAsset.weight), this.swapFee);
-        var tokenInAmount = Math.calcInGivenOut(new unit_1.Dec(inPoolAsset.token.amount), new unit_1.Dec(inPoolAsset.weight), new unit_1.Dec(outPoolAsset.token.amount), new unit_1.Dec(outPoolAsset.weight), new unit_1.Dec(tokenOut.amount), this.swapFee).truncate();
-        var spotPriceAfter = Math.calcSpotPrice(new unit_1.Dec(inPoolAsset.token.amount).add(new unit_1.Dec(tokenInAmount)), new unit_1.Dec(inPoolAsset.weight), new unit_1.Dec(outPoolAsset.token.amount).sub(new unit_1.Dec(tokenOut.amount)), new unit_1.Dec(outPoolAsset.weight), this.swapFee);
-        if (spotPriceAfter.lt(spotPriceBefore)) {
-            throw new Error("spot price can't be decreased after swap");
-        }
-        var effectivePrice = new unit_1.Dec(tokenInAmount).quo(new unit_1.Dec(tokenOut.amount));
-        var slippage = effectivePrice.quo(spotPriceBefore).sub(new unit_1.Dec('1'));
-        return {
-            tokenInAmount: tokenInAmount,
-            spotPriceBefore: spotPriceBefore,
-            spotPriceAfter: spotPriceAfter,
-            slippage: slippage
-        };
-    };
-    GAMMPool.prototype.calculateSpotPrice = function (inDenom, outDenom) {
-        var inPoolAsset = this.getPoolAsset(inDenom);
-        var outPoolAsset = this.getPoolAsset(outDenom);
-        return Math.calcSpotPrice(new unit_1.Dec(inPoolAsset.token.amount), new unit_1.Dec(inPoolAsset.weight), new unit_1.Dec(outPoolAsset.token.amount), new unit_1.Dec(outPoolAsset.weight), new unit_1.Dec(this.data.poolParams.swapFee));
-    };
-    GAMMPool.prototype.calculateSpotPriceWithoutSwapFee = function (inDenom, outDenom) {
-        var inPoolAsset = this.getPoolAsset(inDenom);
-        var outPoolAsset = this.getPoolAsset(outDenom);
-        return Math.calcSpotPrice(new unit_1.Dec(inPoolAsset.token.amount), new unit_1.Dec(inPoolAsset.weight), new unit_1.Dec(outPoolAsset.token.amount), new unit_1.Dec(outPoolAsset.weight), new unit_1.Dec(0));
-    };
-    GAMMPool.prototype.calculateSlippageSlope = function (inDenom, outDenom) {
-        var inPoolAsset = this.getPoolAsset(inDenom);
-        var outPoolAsset = this.getPoolAsset(outDenom);
-        return Math.calcSlippageSlope(new unit_1.Dec(inPoolAsset.token.amount), new unit_1.Dec(inPoolAsset.weight), new unit_1.Dec(outPoolAsset.weight), this.swapFee);
-    };
-    GAMMPool.prototype.getPoolAsset = function (denom) {
-        var poolAsset = this.data.poolAssets.find(function (p) {
-            return p.token.denom === denom;
-        });
-        if (!poolAsset) {
-            throw new Error("pool doesn't have the pool asset for " + denom);
-        }
-        return poolAsset;
-    };
-    return GAMMPool;
-}());
-exports.GAMMPool = GAMMPool;
+    if (!poolAsset) {
+      throw new Error(`pool doesn't have the pool asset for ${denom}`);
+    }
+    return poolAsset;
+  }
+}

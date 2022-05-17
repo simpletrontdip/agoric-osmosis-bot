@@ -1,10 +1,8 @@
 import { E } from '@agoric/eventual-send';
 import { Far } from '@agoric/marshal';
-import * as unit from '@keplr-wallet/unit';
 
+import { Dec } from './math/decimal';
 import { calcSpotPrice } from './math';
-
-const { Dec } = unit;
 
 // from the code
 const SUCCESS_OFFER_MSG = 'Swap successfully completed.';
@@ -84,37 +82,20 @@ const makeAgoricPool = ({
       const allocation = await E(ammAPI).getPoolAllocation(secondaryBrand);
       const centralAmount = allocation.Central;
       const secondaryAmount = allocation.Secondary;
-      console.log(
-        'Here ====>',
-        centralAmount.value,
-        secondaryAmount.value,
-        ammTerms.poolFeeBP,
-        ammTerms.protocolFeeBP,
-        Dec,
-      );
 
       const oneDec = new Dec(1);
-      console.log(
-        'After ====>',
-        oneDec,
-        ammTerms.poolFeeBP + ammTerms.protocolFeeBP,
-        new Dec(ammTerms.poolFeeBP + ammTerms.protocolFeeBP).mul(new Dec(1)),
-      );
+
       const swapFeeDec = new Dec(
         ammTerms.poolFeeBP + ammTerms.protocolFeeBP,
       ).quo(new Dec(10_000n));
 
-      const x = calcSpotPrice(
+      return calcSpotPrice(
         new Dec(centralAmount.value),
         oneDec,
         new Dec(secondaryAmount.value),
         oneDec,
         swapFeeDec,
       );
-
-      console.log('Spot price ====>', x);
-
-      return x;
     },
     async trade(swapInAmount, expectedReturn) {
       const proposal = harden({

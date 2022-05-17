@@ -1,4 +1,4 @@
-import { Int } from '@keplr-wallet/unit';
+import { Int } from '../math/int';
 import { GAMMPool } from './pool';
 
 const data = {

@@ -1,5 +1,6 @@
 /* eslint-disable no-use-before-define */
-import { Dec, Int } from '@keplr-wallet/unit';
+import { Dec } from './decimal';
+import { Int } from './int';
 
 const powPrecision = new Dec('0.00000001');
 const oneDec = new Dec(1);
