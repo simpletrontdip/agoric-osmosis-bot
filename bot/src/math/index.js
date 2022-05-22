@@ -7,6 +7,7 @@ const oneDec = new Dec(1);
 const twoDec = new Dec(2);
 const zeroInt = new Int(0);
 const twoInt = new Int(2);
+
 export function calcSlippageSlope(
   tokenBalanceIn,
   tokenWeightIn,
@@ -18,6 +19,7 @@ export function calcSlippageSlope(
     .mul(tokenWeightIn.add(tokenWeightOut))
     .sub(twoDec.mul(tokenBalanceIn).mul(tokenWeightOut));
 }
+
 export function calcSpotPrice(
   tokenBalanceIn,
   tokenWeightIn,
@@ -30,6 +32,7 @@ export function calcSpotPrice(
   const scale = oneDec.quo(oneDec.sub(swapFee));
   return number.quo(denom).mul(scale);
 }
+
 export function calcOutGivenIn(
   tokenBalanceIn,
   tokenWeightIn,
@@ -46,6 +49,7 @@ export function calcOutGivenIn(
   const bar = oneDec.sub(foo);
   return tokenBalanceOut.mul(bar);
 }
+
 export function calcInGivenOut(
   tokenBalanceIn,
   tokenWeightIn,
@@ -62,6 +66,7 @@ export function calcInGivenOut(
   const tokenAmountIn = oneDec.sub(swapFee);
   return tokenBalanceIn.mul(foo).quo(tokenAmountIn);
 }
+
 export function calcPoolOutGivenSingleIn(
   tokenBalanceIn,
   tokenWeightIn,
@@ -80,6 +85,7 @@ export function calcPoolOutGivenSingleIn(
   const newPoolSupply = poolRatio.mul(poolSupply);
   return newPoolSupply.sub(poolSupply);
 }
+
 export function calcSingleInGivenPoolOut(
   tokenBalanceIn,
   tokenWeightIn,
@@ -102,6 +108,7 @@ export function calcSingleInGivenPoolOut(
   const zar = oneDec.sub(normalizedWeight).mul(swapFee);
   return tokenAmountInAfterFee.quo(oneDec.sub(zar));
 }
+
 export function calcSingleOutGivenPoolIn(
   tokenBalanceOut,
   tokenWeightOut,
@@ -125,6 +132,7 @@ export function calcSingleOutGivenPoolIn(
   const zaz = oneDec.sub(normalizedWeight).mul(swapFee);
   return tokenAmountOutBeforeSwapFee.mul(oneDec.sub(zaz));
 }
+
 export function calcPoolInGivenSingleOut(
   tokenBalanceOut,
   tokenWeightOut,
@@ -163,6 +171,7 @@ function powInt(base, power) {
   }
   return base.mul(tmp);
 }
+
 export function pow(base, exp) {
   // Exponentiation of a negative base with an arbitrary real exponent is not closed within the reals.
   // You can see this by recalling that `i = (-1)^(.5)`. We have to go to complex numbers to define this.
@@ -188,6 +197,7 @@ export function pow(base, exp) {
   const fractionalPow = powApprox(base, fractional, powPrecision);
   return integerPow.mul(fractionalPow);
 }
+
 export function absDifferenceWithSign(a, b) {
   if (a.gte(b)) {
     return [a.sub(b), false];
@@ -195,6 +205,7 @@ export function absDifferenceWithSign(a, b) {
     return [b.sub(a), true];
   }
 }
+
 export function powApprox(base, exp, precision) {
   if (exp.isZero()) {
     return new Dec(0);

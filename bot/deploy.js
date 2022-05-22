@@ -124,6 +124,7 @@ export default async function deployApi(
 
   // Spawn the function
   await E(installation).spawn({
+    zoe,
     ammAPI,
     ammTerms,
     centralBrand,

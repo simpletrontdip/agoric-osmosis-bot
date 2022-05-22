@@ -6,9 +6,9 @@ export class Dec {
   /**
    * Create a new Dec from integer with decimal place at prec
    *
-   * @param int - Parse a number | bigInteger | string into a Dec.
+   * @param {any} int - Parse a number | bigInteger | string into a Dec.
    * If int is string and contains dot(.), prec is ignored and automatically calculated.
-   * @param prec - Precision
+   * @param {number} prec - Precision
    */
   constructor(int, prec = 0) {
     if (typeof int === 'string') {
@@ -70,7 +70,7 @@ export class Dec {
   /**
    * Alias for the greater method.
    *
-   * @param d2
+   * @param {Dec} d2
    */
   gt(d2) {
     return this.int.gt(d2.int);
@@ -79,7 +79,7 @@ export class Dec {
   /**
    * Alias for the greaterOrEquals method.
    *
-   * @param d2
+   * @param {Dec} d2
    */
   gte(d2) {
     return this.int.geq(d2.int);
@@ -88,7 +88,7 @@ export class Dec {
   /**
    * Alias for the lesser method.
    *
-   * @param d2
+   * @param {Dec} d2
    */
   lt(d2) {
     return this.int.lt(d2.int);
@@ -97,7 +97,7 @@ export class Dec {
   /**
    * Alias for the lesserOrEquals method.
    *
-   * @param d2
+   * @param {Dec} d2
    */
   lte(d2) {
     return this.int.leq(d2.int);

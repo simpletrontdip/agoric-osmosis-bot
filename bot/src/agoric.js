@@ -30,8 +30,20 @@ const makeAgoricFund = ({
   };
 
   return Far('Agoric Bot Fund', {
+    async getAmountOf(brand) {
+      const isCentral = brand === centralBrand;
+      const issuer = isCentral ? centralIssuer : secondaryIssuer;
+      const fund = isCentral ? centralFund : secondaryFund;
+
+      return E(issuer).getAmountOf(fund);
+    },
     async withdraw(amount) {
       const isCentral = amount.brand === centralBrand;
+      console.log(
+        'Withdrawing, brand ==>',
+        amount.brand,
+        isCentral ? 'central' : 'secondary',
+      );
       const currentFund = isCentral ? centralFund : secondaryFund;
       const issuer = isCentral ? centralIssuer : secondaryIssuer;
       const updateFund = isCentral ? updateCentralFund : updateSecondaryFund;
@@ -45,9 +57,20 @@ const makeAgoricFund = ({
       return payment;
     },
     async deposit(payment) {
-      const isCentral = payment.getAllegedBrand() === centralBrand;
+      const brand = await E(payment).getAllegedBrand();
+      const isCentral = brand === centralBrand;
+
       const currentFund = isCentral ? centralFund : secondaryFund;
       const issuer = isCentral ? centralIssuer : secondaryIssuer;
+      const amount = await E(issuer).getAmountOf(payment);
+
+      console.log(
+        'Depositing, brand ==>',
+        brand,
+        isCentral ? 'central' : 'secondary',
+        'amount',
+        amount.value,
+      );
       const updateFund = isCentral ? updateCentralFund : updateSecondaryFund;
 
       const combined = await E(issuer).combine([currentFund, payment]);
@@ -55,6 +78,7 @@ const makeAgoricFund = ({
       updateFund(combined);
     },
     async cleanup() {
+      console.log('Cleaning up bot fund');
       return Promise.all([
         E(centralDepositFacetP).receive(centralFund),
         E(secondaryDepositFacetP).receive(secondaryFund),
@@ -109,23 +133,31 @@ const makeAgoricPool = ({
         In: await E(fund).withdraw(swapInAmount),
       });
 
+      console.log(
+        'Offerring a trade',
+        swapInAmount.brand,
+        swapInAmount.value,
+        '==>',
+        expectedReturn.brand,
+        expectedReturn.value,
+      );
+
       const seatP = E(zoe).offer(invitation, proposal, payments);
-
-      E(seatP)
-        .getPayouts()
-        .then(async (payouts) => {
-          // get our money back
-          const swapInRemain = payouts.In;
-          const swapOutPayment = payouts.Out;
-
-          return Promise.all([
-            E(fund).deposit(swapInRemain),
-            E(fund).deposit(swapOutPayment),
-          ]);
-        });
+      const pendingPayments = Promise.all([
+        E(seatP)
+          .getPayout('In')
+          .then((payout) => {
+            return E(fund).deposit(payout);
+          }),
+        E(seatP)
+          .getPayout('Out')
+          .then((payout) => {
+            return E(fund).deposit(payout);
+          }),
+      ]);
 
       const result = await E(seatP).getOfferResult();
-
+      await pendingPayments;
       return result === SUCCESS_OFFER_MSG;
     },
   });

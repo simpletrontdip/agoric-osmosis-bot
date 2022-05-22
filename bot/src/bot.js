@@ -5,10 +5,13 @@ import { AmountMath } from '@agoric/ertp';
 import { Dec } from './math/decimal';
 import { makeAgoricFund, makeAgoricPool } from './agoric.js';
 
+const oneDec = new Dec(1);
+const zeroDec = new Dec(0);
+
 const makeOsmosisPool = () => {
   return Far('Osmosis pool', {
     getSpotPrice() {
-      return new Dec(325n, 1);
+      return new Dec(335n, 1);
     },
   });
 };
@@ -34,33 +37,30 @@ const startBot = async ({
   const secondaryBrand = await E(agoricPool).getSecondaryBrand();
 
   let count = 0;
+  const priceDiffThreshold = new Dec(5n, 4); // 0.5% diff
 
   /**
-   * @param {Dec} refPrice
-   * @param {Dec} currentPrice
-   * @returns boolean
-   */
-  const isEligibleForTrading = (refPrice, currentPrice) => {
-    console.log(
-      'Checking price change',
-      refPrice.toString(),
-      currentPrice.toString(),
-    );
-    return false;
-  };
-
-  /**
+   * @param {Brand} swapInBrand
+   * @param {Brand} returnedBrand
+   * @param currentPrice
+   * @param refPrice
    * @returns {{
    *  swapIn: Dec,
    *  minimalReturn: Dec
    * }}
    */
-  const findOptimialSwapAmount = async () => {
+  const findOptimialSwapAmount = async (
+    swapInBrand,
+    returnedBrand,
+    currentPrice,
+    refPrice,
+  ) => {
+    // TODO find the maximum value of each trade, find the righ price to match the spot
     console.log('Finding optimal amount');
-    return {
-      swapIn: new Dec(0),
-      minimalReturn: new Dec(0),
-    };
+    return harden({
+      swapIn: 500n,
+      minimalReturn: 0n,
+    });
   };
 
   /**
@@ -74,18 +74,33 @@ const startBot = async ({
    * }}
    */
   const calculateTradeAmount = async (refPrice, currentPrice) => {
-    if (!isEligibleForTrading(refPrice, currentPrice)) {
+    console.log(
+      'Checking price change',
+      refPrice.toString(),
+      currentPrice.toString(),
+    );
+
+    const diffRatio = currentPrice.quo(refPrice).sub(oneDec);
+    console.log('Diff ratio', diffRatio.toString());
+    const shouldTrade = diffRatio.abs().gte(priceDiffThreshold);
+
+    if (!shouldTrade) {
       return {
         shouldTrade: false,
       };
     }
-    const swapBrand = refPrice.lt(currentPrice) ? centralBrand : secondaryBrand;
+    const swapInBrand = diffRatio.gt(zeroDec) ? centralBrand : secondaryBrand;
     const returnedBrand = refPrice.lt(currentPrice)
       ? secondaryBrand
       : centralBrand;
 
-    const { swapIn, minimalReturn } = await findOptimialSwapAmount();
-    const swapInAmount = AmountMath.make(swapBrand, swapIn);
+    const { swapIn, minimalReturn } = await findOptimialSwapAmount(
+      swapInBrand,
+      returnedBrand,
+      currentPrice,
+      refPrice,
+    );
+    const swapInAmount = AmountMath.make(swapInBrand, swapIn);
     const expectedReturn = AmountMath.make(returnedBrand, minimalReturn);
 
     return {
@@ -110,7 +125,7 @@ const startBot = async ({
     ]);
 
     console.log(
-      'Price here====>',
+      'Price here ====>',
       refPrice.toString(),
       currentPrice.toString(),
     );
@@ -128,9 +143,19 @@ const startBot = async ({
     const newPrice = await E(agoricPool).getSpotPrice();
 
     if (success) {
-      console.log('Trade succeeded, new price', newPrice);
+      console.log(
+        'Trade succeeded, new price',
+        newPrice.toString(),
+        'old price',
+        currentPrice.toString(),
+      );
     } else {
-      console.log('Trade failed, bc of price change', newPrice);
+      console.log(
+        'Trade failed, bc of price change',
+        newPrice.toString(),
+        'old price',
+        currentPrice.toString(),
+      );
     }
   };
 

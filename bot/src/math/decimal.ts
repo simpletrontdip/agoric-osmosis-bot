@@ -2,7 +2,7 @@ import bigInteger from 'big-integer';
 import { Int } from './int';
 
 // Avoid being frozen when being a class member
-const DecPrecisionMultipliers: {
+const CACHED_PRECISION_MULTIPLIERS: {
   [key: string]: bigInteger.BigInteger | undefined;
 } = {};
 
@@ -18,13 +18,13 @@ export class Dec {
     if (prec.gt(Dec.precision)) {
       throw new Error('Too much precision');
     }
-    if (DecPrecisionMultipliers[prec.toString()]) {
-      return DecPrecisionMultipliers[prec.toString()]!;
+    if (CACHED_PRECISION_MULTIPLIERS[prec.toString()]) {
+      return CACHED_PRECISION_MULTIPLIERS[prec.toString()]!;
     }
 
     const zerosToAdd = Dec.precision.minus(prec);
     const multiplier = bigInteger(10).pow(zerosToAdd);
-    DecPrecisionMultipliers[prec.toString()] = multiplier;
+    CACHED_PRECISION_MULTIPLIERS[prec.toString()] = multiplier;
     return multiplier;
   }
 
