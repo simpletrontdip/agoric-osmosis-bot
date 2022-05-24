@@ -7,26 +7,33 @@ import { E } from '@agoric/eventual-send';
 
 import '@agoric/zoe/exported.js';
 
+const OSMO_DENOM = 'uosmo';
+const USDC_DENOM =
+  'ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858';
+
 const arbitrage = harden({
   agoric: {
     fund: {
       Central: {
-        purse: 'RUN to arbitrage',
-        amount: 1_000n,
+        purse: 'Agoric RUN currency',
+        amount: 10_000n,
       },
       Secondary: {
-        purse: 'ATOM to arbitrage',
-        ammount: 1_000n,
+        purse: 'OSMO to arbitrage',
+        ammount: 10_000n,
       },
     },
     pool: {
-      keyword: 'ATOM',
-      name: 'ATOM/USDC',
+      keyword: 'OSMO',
+      name: 'OSMO/USDC',
     },
   },
   osmosis: {
     pool: {
-      id: '1',
+      id: '678',
+      name: 'OSMO/USDC',
+      inDenom: USDC_DENOM,
+      outDenom: OSMO_DENOM,
     },
   },
 });
@@ -49,11 +56,7 @@ const arbitrage = harden({
  */
 export default async function deployApi(
   homePromise,
-  {
-    bundleSource,
-    pathResolve,
-    // installUnsafePlugin
-  },
+  { bundleSource, pathResolve, installUnsafePlugin },
 ) {
   // Let's wait for the promise to resolve.
   const home = await homePromise;
@@ -62,19 +65,11 @@ export default async function deployApi(
   const { zoe, board, wallet, chainTimerService, spawner } = home;
 
   const poolKeyword = arbitrage.agoric.pool.keyword;
+  const { id: poolId, inDenom, outDenom } = arbitrage.osmosis.pool;
 
-  // const mnemonic = process.env.OSMOSIS_MNEMNONIC;
-  // const rpcEndpoint = process.env.OSMOSIS_RPC_ENDPOINT;
-  // const deploymentId = process.env.OSMOSIS_WATCHED_DSEQ;
-
-  // assert(mnemonic, 'OSMOSIS_MNEMNONIC env variables must not be empty');
-  // assert(rpcEndpoint, 'OSMOSIS_RPC_ENDPOINT env variables must not be empty');
-  // assert(deploymentId, 'OSMOSIS_WATCHED_DSEQ env variables must not be empty');
-
-  // const osmosisClient = await installUnsafePlugin('./src/osmosis.js', {
-  //   mnemonic,
-  //   rpcEndpoint,
-  // }).catch((e) => console.error(`${e}`));
+  const osmosisClient = await installUnsafePlugin('./src/plugin.js', {}).catch(
+    (e) => console.error(`${e}`),
+  );
 
   // Bundle up the handler code
   const bundle = await bundleSource(pathResolve('./src/bot.js'));
@@ -136,5 +131,10 @@ export default async function deployApi(
     centralDepositFacetP,
     secondaryDepositFacetP,
     timeAuthority: chainTimerService,
+    // osmosis config
+    poolId,
+    inDenom,
+    outDenom,
+    osmosisClient,
   });
 }

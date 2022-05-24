@@ -3,15 +3,44 @@ import { Far } from '@agoric/marshal';
 import { AmountMath } from '@agoric/ertp';
 
 import { Dec } from './math/decimal';
+import { calcSpotPrice } from './math';
 import { makeAgoricFund, makeAgoricPool } from './agoric.js';
 
 const oneDec = new Dec(1);
 const zeroDec = new Dec(0);
 
-const makeOsmosisPool = () => {
+const makeOsmosisPool = ({ osmosisClient, poolId, inDenom, outDenom }) => {
+  assert(poolId, 'poolId is required to watch Osmosis pool');
+  assert(inDenom, 'inDenom is required');
+  assert(outDenom, 'outDenom is required');
+
+  let poolData = null;
+
+  const updatePoolData = async () => {
+    const data = await E(osmosisClient).getPoolData(poolId);
+    poolData = data.pool;
+  };
+
   return Far('Osmosis pool', {
-    getSpotPrice() {
-      return new Dec(335n, 1);
+    async getPoolData() {
+      return poolData;
+    },
+    async getSpotPrice() {
+      await updatePoolData();
+      const { poolAssets, poolParams } = poolData;
+      const inPoolAsset = poolAssets.find((p) => p.token.denom === inDenom);
+      const outPoolAsset = poolAssets.find((p) => p.token.denom === outDenom);
+
+      assert(inPoolAsset, `Pool asset for ${inDenom} could not be found`);
+      assert(outPoolAsset, `Pool asset for ${outDenom} could not be found`);
+
+      return calcSpotPrice(
+        new Dec(inPoolAsset.token.amount),
+        new Dec(inPoolAsset.weight),
+        new Dec(outPoolAsset.token.amount),
+        new Dec(outPoolAsset.weight),
+        new Dec(poolParams.swapFee),
+      );
     },
   });
 };
@@ -22,9 +51,10 @@ const startBot = async ({
   maxRunCount = 2,
   ...args
 }) => {
+  console.log('Starting bot', args.poolId);
   const osmosisPool = makeOsmosisPool(args);
-  const agoricFund = await makeAgoricFund(args);
-  const agoricPool = await makeAgoricPool({
+  const agoricFund = makeAgoricFund(args);
+  const agoricPool = makeAgoricPool({
     ...args,
     fund: agoricFund,
   });
@@ -58,7 +88,7 @@ const startBot = async ({
     // TODO find the maximum value of each trade, find the righ price to match the spot
     console.log('Finding optimal amount');
     return harden({
-      swapIn: 500n,
+      swapIn: 10_000n,
       minimalReturn: 0n,
     });
   };
@@ -125,8 +155,10 @@ const startBot = async ({
     ]);
 
     console.log(
-      'Price here ====>',
+      'Price ====>',
+      'osmosis',
       refPrice.toString(),
+      'agoric',
       currentPrice.toString(),
     );
 
@@ -196,6 +228,7 @@ const startBot = async ({
   console.log('Starting the bot');
   // await registerNextWakeupCheck();
   await checkAndActOnPriceChanges();
+  await E(agoricFund).cleanup();
   console.log('Done');
 };
 
