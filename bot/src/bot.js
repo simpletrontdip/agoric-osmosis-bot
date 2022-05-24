@@ -48,10 +48,9 @@ const makeOsmosisPool = ({ osmosisClient, poolId, inDenom, outDenom }) => {
 const startBot = async ({
   timeAuthority,
   checkInterval = 15n,
-  maxRunCount = 2,
+  maxRunCount = 3,
   ...args
 }) => {
-  console.log('Starting bot', args.poolId);
   const osmosisPool = makeOsmosisPool(args);
   const agoricFund = makeAgoricFund(args);
   const agoricPool = makeAgoricPool({
@@ -88,7 +87,7 @@ const startBot = async ({
     // TODO find the maximum value of each trade, find the righ price to match the spot
     console.log('Finding optimal amount');
     return harden({
-      swapIn: 10_000n,
+      swapIn: 100_000n,
       minimalReturn: 0n,
     });
   };
@@ -111,7 +110,7 @@ const startBot = async ({
     );
 
     const diffRatio = currentPrice.quo(refPrice).sub(oneDec);
-    console.log('Diff ratio', diffRatio.toString());
+    console.log('Diff ratio', diffRatio.mul(new Dec(100n)).toString(), '%');
     const shouldTrade = diffRatio.abs().gte(priceDiffThreshold);
 
     if (!shouldTrade) {
@@ -226,9 +225,9 @@ const startBot = async ({
   };
 
   console.log('Starting the bot');
-  // await registerNextWakeupCheck();
-  await checkAndActOnPriceChanges();
-  await E(agoricFund).cleanup();
+  await registerNextWakeupCheck();
+  // await checkAndActOnPriceChanges();
+  // await E(agoricFund).cleanup();
   console.log('Done');
 };
 
