@@ -20,8 +20,8 @@ const makeAmountFromDec = (brand, decVal) => {
 
 const startBot = async ({
   timeAuthority,
-  checkInterval = 15n,
-  maxRunCount = 5,
+  checkInterval = 10n,
+  maxRunCount = 10,
   // maxTradeAmount = 10_000_000n,
   ...args
 }) => {
@@ -243,7 +243,10 @@ const startBot = async ({
 
     const currentTs = await E(timeAuthority).getCurrentTimestamp();
     const checkAfter = currentTs + checkInterval;
-    console.log('Registering next wakeup call (', count, ') at', checkAfter);
+    console.log(
+      `==> ((${count})) <== Registering next wakeup call at`,
+      checkAfter,
+    );
 
     E(timeAuthority)
       .setWakeup(
