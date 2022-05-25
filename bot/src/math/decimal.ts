@@ -1,5 +1,6 @@
 import bigInteger from 'big-integer';
 import { Int } from './int';
+import { sqrt } from './util';
 
 // Avoid being frozen when being a class member
 const CACHED_PRECISION_MULTIPLIERS: {
@@ -8,6 +9,8 @@ const CACHED_PRECISION_MULTIPLIERS: {
 
 export class Dec {
   public static readonly precision: bigInteger.BigInteger = bigInteger(18);
+
+  public static readonly sqrtPrecision: number = 9;
 
   private static calcPrecisionMultiplier(
     prec: bigInteger.BigInteger,
@@ -187,6 +190,11 @@ export class Dec {
   public isInteger(): boolean {
     const precision = Dec.calcPrecisionMultiplier(bigInteger(0));
     return this.int.remainder(precision).equals(bigInteger(0));
+  }
+
+  public sqrt(): Dec {
+    // XXX Util.sqrt will only return bigint, so the sqrt would only be precise on big number
+    return new Dec(sqrt(BigInt(this.int.toJSON())), Dec.sqrtPrecision);
   }
 
   /**

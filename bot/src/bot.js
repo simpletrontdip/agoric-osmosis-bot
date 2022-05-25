@@ -7,7 +7,15 @@ import { calcSpotPrice } from './math';
 import { makeAgoricFund, makeAgoricPool } from './agoric.js';
 
 const oneDec = new Dec(1);
-const zeroDec = new Dec(0);
+const oneHundred = new Dec(100);
+const oneExp6 = new Dec(1_000_000n);
+const AGORIC_AMOUNT_PRECISION = 6;
+
+const makeAmountFromDec = (brand, decVal) => {
+  const value = BigInt(decVal.mul(oneExp6).round().toString());
+  console.log('Value ===>', value, typeof value);
+  return AmountMath.make(brand, value);
+};
 
 const makeOsmosisPool = ({ osmosisClient, poolId, inDenom, outDenom }) => {
   assert(poolId, 'poolId is required to watch Osmosis pool');
@@ -49,6 +57,7 @@ const startBot = async ({
   timeAuthority,
   checkInterval = 15n,
   maxRunCount = 3,
+  // maxTradeAmount = 10_000_000n,
   ...args
 }) => {
   const osmosisPool = makeOsmosisPool(args);
@@ -67,28 +76,115 @@ const startBot = async ({
 
   let count = 0;
   const priceDiffThreshold = new Dec(5n, 4); // 0.5% diff
+  const xyDiffThresholdPercentage = new Dec(5n, 4); // 0.005%
+  const priceDiffThresholdPercentage = new Dec(5n, 4); // 0.005%
 
   /**
-   * @param {Brand} swapInBrand
-   * @param {Brand} returnedBrand
-   * @param currentPrice
-   * @param refPrice
+   * @param {Dec} refPrice
    * @returns {{
-   *  swapIn: Dec,
-   *  minimalReturn: Dec
+   *  swapInAmount: Amount,
+   *  expectedReturn: Amount
    * }}
    */
-  const findOptimialSwapAmount = async (
-    swapInBrand,
-    returnedBrand,
-    currentPrice,
-    refPrice,
-  ) => {
-    // TODO find the maximum value of each trade, find the righ price to match the spot
+  const findOptimalSwapAmount = async (refPrice) => {
+    // We have
+    // (Central + dCentral)(Secondary + dSecondary) = Central * Secondary
+    // (Central + dCentral)/(Secondary + dSecondary) = refPrice
+
+    // solve it (with dCentral * dSecondary < 0)
+    // dCentral = sqrt(Central * Secondary * refPrice) - Central
+    // dSecondary = sqrt(Central * Secondary / refPrice) - Secondary
+
     console.log('Finding optimal amount');
+    const allocation = await E(agoricPool).getPoolAllocation();
+
+    const centralAmountDec = new Dec(
+      allocation.Central.value,
+      AGORIC_AMOUNT_PRECISION,
+    );
+    const secondaryAmountDec = new Dec(
+      allocation.Secondary.value,
+      AGORIC_AMOUNT_PRECISION,
+    );
+    console.log(
+      'Allocation ====>',
+      centralAmountDec.toString(),
+      secondaryAmountDec.toString(),
+    );
+
+    const XY = centralAmountDec.mul(secondaryAmountDec);
+    const dCentralAmount = XY.mul(refPrice).sqrt().sub(centralAmountDec);
+    const dSecondaryAmount = XY.quo(refPrice).sqrt().sub(secondaryAmountDec);
+
+    const newCentralAmount = centralAmountDec.add(dCentralAmount);
+    const newSecondaryAmount = secondaryAmountDec.add(dSecondaryAmount);
+    const newXY = newCentralAmount.mul(newSecondaryAmount);
+    const newPrice = newCentralAmount.quo(newSecondaryAmount);
+
+    const xyDiff = XY.sub(newXY);
+    const xyDiffRatio = xyDiff.quo(XY).mul(oneHundred);
+    const priceDiff = refPrice.sub(newPrice);
+    const priceDiffRatio = priceDiff.quo(refPrice).mul(oneHundred);
+
+    assert(
+      xyDiffRatio.lte(xyDiffThresholdPercentage),
+      `Something wrong, XY invariant is violated, diffRatio: ${xyDiffRatio}`,
+    );
+
+    assert(
+      priceDiffRatio.lte(priceDiffThresholdPercentage),
+      `Something wrong, priceDiff is not correct, diffRatio: ${priceDiffRatio}`,
+    );
+
+    assert(
+      dCentralAmount.mul(dSecondaryAmount).isNegative(),
+      `Something wrong, swap amounts seem not correct dCentral ${dCentralAmount.toString()}, dSecondary ${dSecondaryAmount.toString()}`,
+    );
+
+    console.log(
+      'Testing back ===> XY:',
+      xyDiff.toString(),
+      'rate(%):',
+      xyDiffRatio.toString(),
+    );
+
+    console.log(
+      'Testing back ===> price:',
+      priceDiff.toString(),
+      'rate(%):',
+      priceDiffRatio.toString(),
+    );
+
+    console.log(
+      'Found value, central',
+      dCentralAmount.toString(),
+      'secondary',
+      dSecondaryAmount.toString(),
+    );
+
+    const shouldDepositCentral = dCentralAmount.isPositive();
+
+    const swapIn = shouldDepositCentral ? dCentralAmount : dSecondaryAmount;
+    const swapInBrand = shouldDepositCentral ? centralBrand : secondaryBrand;
+
+    const minimalReturn = shouldDepositCentral
+      ? dSecondaryAmount.neg()
+      : dCentralAmount.neg();
+    const returnedBrand = shouldDepositCentral ? secondaryBrand : centralBrand;
+
+    console.log(
+      'Swap final result, swapIn:',
+      swapIn.toString(AGORIC_AMOUNT_PRECISION),
+      'minimalReturn:',
+      minimalReturn.toString(AGORIC_AMOUNT_PRECISION),
+    );
+
+    const swapInAmount = makeAmountFromDec(swapInBrand, swapIn);
+    const expectedReturn = makeAmountFromDec(returnedBrand, minimalReturn);
+
     return harden({
-      swapIn: 100_000n,
-      minimalReturn: 0n,
+      swapInAmount,
+      expectedReturn,
     });
   };
 
@@ -118,19 +214,10 @@ const startBot = async ({
         shouldTrade: false,
       };
     }
-    const swapInBrand = diffRatio.gt(zeroDec) ? centralBrand : secondaryBrand;
-    const returnedBrand = refPrice.lt(currentPrice)
-      ? secondaryBrand
-      : centralBrand;
 
-    const { swapIn, minimalReturn } = await findOptimialSwapAmount(
-      swapInBrand,
-      returnedBrand,
-      currentPrice,
+    const { swapInAmount, expectedReturn } = await findOptimalSwapAmount(
       refPrice,
     );
-    const swapInAmount = AmountMath.make(swapInBrand, swapIn);
-    const expectedReturn = AmountMath.make(returnedBrand, minimalReturn);
 
     return {
       shouldTrade: true,
@@ -225,9 +312,10 @@ const startBot = async ({
   };
 
   console.log('Starting the bot');
-  await registerNextWakeupCheck();
-  // await checkAndActOnPriceChanges();
-  // await E(agoricFund).cleanup();
+  // await registerNextWakeupCheck();
+  await checkAndActOnPriceChanges();
+  await E(agoricFund).cleanup();
+
   console.log('Done');
 };
 

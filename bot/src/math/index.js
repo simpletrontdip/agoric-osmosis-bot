@@ -1,6 +1,6 @@
 /* eslint-disable no-use-before-define */
-import { Dec } from './decimal';
-import { Int } from './int';
+import { Dec } from './decimal.js';
+import { Int } from './int.js';
 
 const powPrecision = new Dec('0.00000001');
 const oneDec = new Dec(1);

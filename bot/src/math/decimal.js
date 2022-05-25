@@ -1,14 +1,16 @@
 import bigInteger from 'big-integer';
-import { Int } from './int';
+import { Int } from './int.js';
+import { sqrt } from './util.js';
 
-const DecPrecisionMultipliers = {};
+// Avoid being frozen when being a class member
+const CACHED_PRECISION_MULTIPLIERS = {};
 export class Dec {
   /**
    * Create a new Dec from integer with decimal place at prec
    *
-   * @param {any} int - Parse a number | bigInteger | string into a Dec.
+   * @param int - Parse a number | bigInteger | string into a Dec.
    * If int is string and contains dot(.), prec is ignored and automatically calculated.
-   * @param {number} prec - Precision
+   * @param prec - Precision
    */
   constructor(int, prec = 0) {
     if (typeof int === 'string') {
@@ -42,12 +44,12 @@ export class Dec {
     if (prec.gt(Dec.precision)) {
       throw new Error('Too much precision');
     }
-    if (DecPrecisionMultipliers[prec.toString()]) {
-      return DecPrecisionMultipliers[prec.toString()];
+    if (CACHED_PRECISION_MULTIPLIERS[prec.toString()]) {
+      return CACHED_PRECISION_MULTIPLIERS[prec.toString()];
     }
     const zerosToAdd = Dec.precision.minus(prec);
     const multiplier = bigInteger(10).pow(zerosToAdd);
-    DecPrecisionMultipliers[prec.toString()] = multiplier;
+    CACHED_PRECISION_MULTIPLIERS[prec.toString()] = multiplier;
     return multiplier;
   }
 
@@ -70,7 +72,7 @@ export class Dec {
   /**
    * Alias for the greater method.
    *
-   * @param {Dec} d2
+   * @param d2
    */
   gt(d2) {
     return this.int.gt(d2.int);
@@ -79,7 +81,7 @@ export class Dec {
   /**
    * Alias for the greaterOrEquals method.
    *
-   * @param {Dec} d2
+   * @param d2
    */
   gte(d2) {
     return this.int.geq(d2.int);
@@ -88,7 +90,7 @@ export class Dec {
   /**
    * Alias for the lesser method.
    *
-   * @param {Dec} d2
+   * @param d2
    */
   lt(d2) {
     return this.int.lt(d2.int);
@@ -97,7 +99,7 @@ export class Dec {
   /**
    * Alias for the lesserOrEquals method.
    *
-   * @param {Dec} d2
+   * @param d2
    */
   lte(d2) {
     return this.int.leq(d2.int);
@@ -174,6 +176,11 @@ export class Dec {
   isInteger() {
     const precision = Dec.calcPrecisionMultiplier(bigInteger(0));
     return this.int.remainder(precision).equals(bigInteger(0));
+  }
+
+  sqrt() {
+    // XXX Util.sqrt will only return bigint, so the sqrt would only be precise on big number
+    return new Dec(sqrt(BigInt(this.int.toJSON())), Dec.sqrtPrecision);
   }
 
   /**
@@ -273,3 +280,4 @@ export class Dec {
   }
 }
 Dec.precision = bigInteger(18);
+Dec.sqrtPrecision = 9;

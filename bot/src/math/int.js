@@ -3,11 +3,11 @@ import bigInteger from 'big-integer';
 
 export class Int {
   /**
-   * @param {any} int - Parse a number | bigInteger | string into a bigInt.
+   * @param int - Parse a number | bigInteger | string into a bigInt.
    * Remaing parameters only will be used when type of int is string.
-   * @param {number} base - Default base is 10.
-   * @param {string} alphabet - Default alphabet is "0123456789abcdefghijklmnopqrstuvwxyz".
-   * @param {boolean} caseSensitive - Defaults to false.
+   * @param base - Default base is 10.
+   * @param alphabet - Default alphabet is "0123456789abcdefghijklmnopqrstuvwxyz".
+   * @param caseSensitive - Defaults to false.
    */
   constructor(int, base, alphabet, caseSensitive) {
     if (typeof int === 'string') {
@@ -71,11 +71,11 @@ export class Int {
 }
 export class Uint {
   /**
-   * @param {any} uint - Parse a number | bigInteger | string into a bigUint.
+   * @param uint - Parse a number | bigInteger | string into a bigUint.
    * Remaing parameters only will be used when type of int is string.
-   * @param {number} base - Default base is 10.
-   * @param {string} alphabet - Default alphabet is "0123456789abcdefghijklmnopqrstuvwxyz".
-   * @param {boolean} caseSensitive - Defaults to false.
+   * @param base - Default base is 10.
+   * @param alphabet - Default alphabet is "0123456789abcdefghijklmnopqrstuvwxyz".
+   * @param caseSensitive - Defaults to false.
    */
   constructor(uint, base, alphabet, caseSensitive) {
     if (typeof uint === 'string') {

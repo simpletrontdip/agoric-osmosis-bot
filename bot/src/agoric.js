@@ -102,6 +102,9 @@ const makeAgoricPool = ({
     getSecondaryBrand() {
       return secondaryBrand;
     },
+    async getPoolAllocation() {
+      return E(ammAPI).getPoolAllocation(secondaryBrand);
+    },
     async getSpotPrice() {
       console.log('Agoric pool, getting spot price');
       const allocation = await E(ammAPI).getPoolAllocation(secondaryBrand);
