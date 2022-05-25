@@ -1,11 +1,10 @@
 import { E } from '@agoric/eventual-send';
 import { Far } from '@agoric/marshal';
 
+import { AmountMath } from '@agoric/ertp';
 import { Dec } from './math/decimal';
 import { calcSpotPrice } from './math';
 
-// from the code
-const SUCCESS_OFFER_MSG = 'Swap successfully completed.';
 const BP_PRECISIONS = 4;
 
 const makeAgoricFund = ({
@@ -76,6 +75,7 @@ const makeAgoricFund = ({
       const combined = await E(issuer).combine([currentFund, payment]);
 
       updateFund(combined);
+      return amount;
     },
     async cleanup() {
       console.log('Cleaning up bot fund');
@@ -145,7 +145,9 @@ const makeAgoricPool = ({
         expectedReturn.value,
       );
 
+      let isTradeOk = false;
       const seatP = E(zoe).offer(invitation, proposal, payments);
+
       const pendingPayments = Promise.all([
         E(seatP)
           .getPayout('In')
@@ -154,14 +156,17 @@ const makeAgoricPool = ({
           }),
         E(seatP)
           .getPayout('Out')
-          .then((payout) => {
-            return E(fund).deposit(payout);
+          .then(async (payout) => {
+            const amount = await E(fund).deposit(payout);
+
+            // Swap amount should not be empty
+            isTradeOk = !AmountMath.isEmpty(amount);
           }),
       ]);
 
-      const result = await E(seatP).getOfferResult();
+      await E(seatP).getOfferResult();
       await pendingPayments;
-      return result === SUCCESS_OFFER_MSG;
+      return isTradeOk;
     },
   });
 };

@@ -9,11 +9,12 @@ import { makeAgoricFund, makeAgoricPool } from './agoric.js';
 const oneDec = new Dec(1);
 const oneHundred = new Dec(100);
 const oneExp6 = new Dec(1_000_000n);
+
+const isDebugging = false;
 const AGORIC_AMOUNT_PRECISION = 6;
 
 const makeAmountFromDec = (brand, decVal) => {
   const value = BigInt(decVal.mul(oneExp6).round().toString());
-  console.log('Value ===>', value, typeof value);
   return AmountMath.make(brand, value);
 };
 
@@ -78,6 +79,7 @@ const startBot = async ({
   const priceDiffThreshold = new Dec(5n, 4); // 0.5% diff
   const xyDiffThresholdPercentage = new Dec(5n, 4); // 0.005%
   const priceDiffThresholdPercentage = new Dec(5n, 4); // 0.005%
+  const expectedReturnScale = oneDec.sub(new Dec(15n, 2));
 
   /**
    * @param {Dec} refPrice
@@ -177,10 +179,15 @@ const startBot = async ({
       swapIn.toString(AGORIC_AMOUNT_PRECISION),
       'minimalReturn:',
       minimalReturn.toString(AGORIC_AMOUNT_PRECISION),
+      'scale',
+      expectedReturnScale.toString(),
     );
 
     const swapInAmount = makeAmountFromDec(swapInBrand, swapIn);
-    const expectedReturn = makeAmountFromDec(returnedBrand, minimalReturn);
+    const expectedReturn = makeAmountFromDec(
+      returnedBrand,
+      minimalReturn.mul(expectedReturnScale),
+    );
 
     return harden({
       swapInAmount,
@@ -264,8 +271,8 @@ const startBot = async ({
       console.log(
         'Trade succeeded, new price',
         newPrice.toString(),
-        'old price',
-        currentPrice.toString(),
+        'ref price',
+        refPrice.toString(),
       );
     } else {
       console.log(
@@ -311,10 +318,13 @@ const startBot = async ({
       });
   };
 
-  console.log('Starting the bot');
-  // await registerNextWakeupCheck();
-  await checkAndActOnPriceChanges();
-  await E(agoricFund).cleanup();
+  console.log('Starting the bot, debug:', isDebugging);
+  if (isDebugging) {
+    await checkAndActOnPriceChanges();
+    await E(agoricFund).cleanup();
+  } else {
+    await registerNextWakeupCheck();
+  }
 
   console.log('Done');
 };
