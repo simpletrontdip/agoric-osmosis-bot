@@ -7,6 +7,7 @@ import { calcSpotPrice } from './math';
 
 const BP_PRECISIONS = 4;
 const zeroDec = new Dec(0);
+const oneDec = new Dec(1);
 
 const makeAgoricFund = ({
   centralBrand,
@@ -96,6 +97,11 @@ const makeAgoricPool = ({
   secondaryBrand,
   fund,
 }) => {
+  const swapFeeDec = new Dec(
+    ammTerms.poolFeeBP + ammTerms.protocolFeeBP,
+    BP_PRECISIONS,
+  );
+
   return Far('Agoric Bot Pool', {
     getCentralBrand() {
       return centralBrand;
@@ -111,13 +117,6 @@ const makeAgoricPool = ({
       const allocation = await E(ammAPI).getPoolAllocation(secondaryBrand);
       const centralAmount = allocation.Central;
       const secondaryAmount = allocation.Secondary;
-
-      const oneDec = new Dec(1);
-
-      const swapFeeDec = new Dec(
-        ammTerms.poolFeeBP + ammTerms.protocolFeeBP,
-        BP_PRECISIONS,
-      );
 
       return calcSpotPrice(
         new Dec(centralAmount.value),
