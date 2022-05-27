@@ -36,9 +36,6 @@ const startBot = async ({
   assert(agoricPool, 'Agoric pool is required');
   assert(agoricFund, 'Agoric Fund is required');
 
-  const centralBrand = await E(agoricPool).getCentralBrand();
-  const secondaryBrand = await E(agoricPool).getSecondaryBrand();
-
   let count = 0;
   const xyDiffThreshold = new Dec(5n, 4); // 0.005%
   const priceDiffThreshold = new Dec(5n, 4); // 0.005% diff
@@ -74,6 +71,9 @@ const startBot = async ({
   const findOptimalSwapAmount = async (refPrice) => {
     console.log('Finding optimal amount');
     const allocation = await E(agoricPool).getPoolAllocation();
+
+    const centralBrand = allocation.Central.brand;
+    const secondaryBrand = allocation.Secondary.brand;
 
     const centralAmountDec = new Dec(
       allocation.Central.value,
@@ -268,6 +268,7 @@ const startBot = async ({
   };
 
   console.log('Starting the bot, debug:', isDebugging);
+
   if (isDebugging) {
     await checkAndActOnPriceChanges();
     await E(agoricFund).cleanup();

@@ -159,7 +159,7 @@ const makeAgoricPool = ({
           .then(async (payout) => {
             const amount = await E(fund).deposit(payout);
 
-            // Swap amount should not be empty
+            // Swap out amount should not be empty
             isTradeOk = !AmountMath.isEmpty(amount);
           }),
       ]);
