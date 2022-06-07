@@ -8,8 +8,7 @@ import { E } from '@agoric/eventual-send';
 import '@agoric/zoe/exported.js';
 
 const OSMO_DENOM = 'uosmo';
-const USDC_DENOM =
-  'ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858';
+const USDC_DENOM = 'uusdc';
 
 const arbitrage = harden({
   agoric: {
@@ -30,7 +29,7 @@ const arbitrage = harden({
   },
   osmosis: {
     pool: {
-      id: '678',
+      id: '1',
       name: 'OSMO/USDC',
       inDenom: USDC_DENOM,
       outDenom: OSMO_DENOM,
