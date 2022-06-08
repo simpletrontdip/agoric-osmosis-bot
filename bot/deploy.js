@@ -31,8 +31,8 @@ const arbitrage = harden({
     pool: {
       id: '1',
       name: 'OSMO/USDC',
-      inDenom: USDC_DENOM,
-      outDenom: OSMO_DENOM,
+      centralDenom: USDC_DENOM,
+      secondaryDenom: OSMO_DENOM,
     },
   },
 });
@@ -64,7 +64,7 @@ export default async function deployApi(
   const { zoe, board, wallet, chainTimerService, spawner } = home;
 
   const poolKeyword = arbitrage.agoric.pool.keyword;
-  const { id: poolId, inDenom, outDenom } = arbitrage.osmosis.pool;
+  const { id: poolId, centralDenom, secondaryDenom } = arbitrage.osmosis.pool;
 
   const osmosisClient = await installUnsafePlugin('./src/plugin.js', {}).catch(
     (e) => console.error(`${e}`),
@@ -132,8 +132,8 @@ export default async function deployApi(
     timeAuthority: chainTimerService,
     // osmosis config
     poolId,
-    inDenom,
-    outDenom,
+    centralDenom,
+    secondaryDenom,
     osmosisClient,
   });
 }

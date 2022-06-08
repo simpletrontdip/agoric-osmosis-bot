@@ -1,6 +1,6 @@
 import { Far } from '@agoric/marshal';
 import Long from 'long';
-import Osmo from 'osmojs';
+import { getSigningOsmosisClient } from 'osmojs';
 import axios from 'axios';
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 import { MessageComposer } from 'osmojs/main/proto/osmosis/gamm/v1beta1/tx.registry.js';
@@ -8,7 +8,7 @@ import { MessageComposer } from 'osmojs/main/proto/osmosis/gamm/v1beta1/tx.regis
 const DEFAULT_MNEMONIC =
   'notice oak worry limit wrap speak medal online prefer cluster roof addict wrist behave treat actual wasp year salad speed social layer crew genius';
 const DEFAULT_OSMOSIS_RPC = 'http://localhost:26657';
-const DEFAULT_OSMOSIS_LCD = 'http://localhost:1337';
+const DEFAULT_OSMOSIS_LCD = 'http://localhost:1317';
 
 const DEFAULT_FEE = {
   amount: [],
@@ -23,7 +23,7 @@ const initClient = async (mnemonic, rpcEndpoint, lcdEndpoint) => {
   const address = accounts[0].address;
 
   // signing client
-  const osmo = await Osmo.getSigningOsmosisClient({
+  const osmo = await getSigningOsmosisClient({
     rpcEndpoint,
     signer: offlineSigner,
   });
@@ -85,11 +85,19 @@ export const bootPlugin = () => {
           [broadcastedMsg],
           stdFee,
         );
+
+        const isOk = !result.code;
+
         console.log(
           'Broadcasted',
-          result.code ? 'failed' : 'succeeded',
+          isOk ? 'succeeded' : 'failed',
           result.transactionHash,
         );
+
+        if (!isOk) {
+          throw Error('Transaction failed');
+        }
+
         return result;
       };
 
@@ -121,6 +129,7 @@ export const bootPlugin = () => {
         ) {
           assert(osmo, 'Client need to be initalized');
           assert(poolId, 'Pool id is required');
+          assert(tokenOutMinAmount, 'tokenOutMinAmount is required');
 
           return broadcastTxMsg('swapExactAmountIn', {
             sender: address,
@@ -134,17 +143,19 @@ export const bootPlugin = () => {
               denom: tokenInDenom,
               amount: tokenInAmount.toString(),
             },
-            tokenOutMinAmount: (tokenOutMinAmount || '').toString(),
+            tokenOutMinAmount: tokenOutMinAmount.toString(),
           });
         },
         async swapExactAmountOut(
           poolId,
-          tokenInDenom,
-          tokenInMaxAmount,
           tokenOutDenom,
           tokenOutAmount,
+          tokenInDenom,
+          tokenInMaxAmount,
         ) {
           assert(osmo, 'Client need to be initalized');
+          assert(poolId, 'Pool id is required');
+          assert(tokenInMaxAmount, 'tokenInMaxAmount is required');
 
           return broadcastTxMsg('swapExactAmountOut', {
             sender: address,
@@ -158,7 +169,7 @@ export const bootPlugin = () => {
               denom: tokenOutDenom,
               amount: tokenOutAmount.toString(),
             },
-            tokenInMaxAmount: (tokenInMaxAmount || '').toString(),
+            tokenInMaxAmount: tokenInMaxAmount.toString(),
           });
         },
       });

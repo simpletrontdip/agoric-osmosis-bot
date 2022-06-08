@@ -6,10 +6,17 @@ import { calcSpotPrice } from './math';
 
 const zeroDec = new Dec(0);
 
-const makeOsmosisPool = ({ osmosisClient, poolId, inDenom, outDenom }) => {
+const makeOsmosisPool = async ({
+  osmosisClient,
+  poolId,
+  centralDenom,
+  secondaryDenom,
+}) => {
   assert(poolId, 'poolId is required to watch Osmosis pool');
-  assert(inDenom, 'inDenom is required');
-  assert(outDenom, 'outDenom is required');
+  assert(centralDenom, 'centralDenom is required');
+  assert(secondaryDenom, 'secondaryDenom is required');
+
+  await E(osmosisClient).initialize();
 
   let poolData = null;
 
@@ -19,17 +26,27 @@ const makeOsmosisPool = ({ osmosisClient, poolId, inDenom, outDenom }) => {
   };
 
   return Far('Osmosis pool', {
+    name() {
+      return 'Osmosis';
+    },
     async getPoolData() {
       return poolData;
     },
     async getSpotPrice(includeSwapFee) {
       await updatePoolData();
       const { poolAssets, poolParams } = poolData;
-      const inPoolAsset = poolAssets.find((p) => p.token.denom === inDenom);
-      const outPoolAsset = poolAssets.find((p) => p.token.denom === outDenom);
+      const inPoolAsset = poolAssets.find(
+        (p) => p.token.denom === centralDenom,
+      );
+      const outPoolAsset = poolAssets.find(
+        (p) => p.token.denom === secondaryDenom,
+      );
 
-      assert(inPoolAsset, `Pool asset for ${inDenom} could not be found`);
-      assert(outPoolAsset, `Pool asset for ${outDenom} could not be found`);
+      assert(inPoolAsset, `Pool asset for ${centralDenom} could not be found`);
+      assert(
+        outPoolAsset,
+        `Pool asset for ${secondaryDenom} could not be found`,
+      );
 
       return calcSpotPrice(
         new Dec(inPoolAsset.token.amount),
@@ -38,6 +55,53 @@ const makeOsmosisPool = ({ osmosisClient, poolId, inDenom, outDenom }) => {
         new Dec(outPoolAsset.weight),
         includeSwapFee ? new Dec(poolParams.swapFee) : zeroDec,
       );
+    },
+    async sellToken(inAmount, minReturn) {
+      // sell secondary coin
+      const inDenom = secondaryDenom;
+      const outDenom = centralDenom;
+
+      console.log(
+        'Osmosis: Selling',
+        inAmount,
+        inDenom,
+        'With min return',
+        minReturn,
+        outDenom,
+      );
+
+      return E(osmosisClient).swapExactAmountIn(
+        poolId,
+        inDenom,
+        inAmount,
+        outDenom,
+        minReturn,
+      );
+    },
+    async buyToken(outAmount, maxSpend) {
+      // buy secondary coin
+      const inDenom = centralDenom;
+      const outDenom = secondaryDenom;
+
+      console.log(
+        'Osmosis: Buying',
+        outAmount,
+        outDenom,
+        'With max spend',
+        maxSpend,
+        inDenom,
+      );
+
+      return E(osmosisClient).swapExactAmountOut(
+        poolId,
+        outDenom,
+        outAmount,
+        inDenom,
+        maxSpend,
+      );
+    },
+    async shutdown() {
+      console.log('Shutting down Osmosis pool');
     },
   });
 };

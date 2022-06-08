@@ -9,6 +9,13 @@ const BP_PRECISIONS = 4;
 const zeroDec = new Dec(0);
 const oneDec = new Dec(1);
 
+const showBrand = (b) => `${b}`.replace(/.object Alleged: (.*) brand./, '$1');
+
+const showAmount = ({ brand, value }) => {
+  const b = `${showBrand(brand)}`;
+  return `${value} ${b}`;
+};
+
 const makeAgoricFund = ({
   centralBrand,
   // secondaryBrand,
@@ -41,8 +48,8 @@ const makeAgoricFund = ({
     async withdraw(amount) {
       const isCentral = amount.brand === centralBrand;
       console.log(
-        'Withdrawing, brand ==>',
-        amount.brand,
+        'Withdrawing ==>',
+        showBrand(amount.brand),
         isCentral ? 'central' : 'secondary',
       );
       const currentFund = isCentral ? centralFund : secondaryFund;
@@ -66,8 +73,8 @@ const makeAgoricFund = ({
       const amount = await E(issuer).getAmountOf(payment);
 
       console.log(
-        'Depositing, brand ==>',
-        brand,
+        'Depositing ==>',
+        showBrand(brand),
         isCentral ? 'central' : 'secondary',
         'amount',
         amount.value,
@@ -102,18 +109,39 @@ const makeAgoricPool = ({
     BP_PRECISIONS,
   );
 
+  const makePoolTrade = async (invitation, proposal, payments) => {
+    let isTradeOk = false;
+    const seatP = E(zoe).offer(invitation, proposal, payments);
+
+    const pendingPayments = Promise.all([
+      E(seatP)
+        .getPayout('In')
+        .then((payout) => {
+          return E(fund).deposit(payout);
+        }),
+      E(seatP)
+        .getPayout('Out')
+        .then(async (payout) => {
+          const amount = await E(fund).deposit(payout);
+
+          // Swap out amount should not be empty
+          isTradeOk = !AmountMath.isEmpty(amount);
+        }),
+    ]);
+
+    await E(seatP).getOfferResult();
+    await pendingPayments;
+    return isTradeOk;
+  };
+
   return Far('Agoric Bot Pool', {
-    getCentralBrand() {
-      return centralBrand;
-    },
-    getSecondaryBrand() {
-      return secondaryBrand;
+    name() {
+      return 'Agoric';
     },
     async getPoolAllocation() {
       return E(ammAPI).getPoolAllocation(secondaryBrand);
     },
     async getSpotPrice(includeSwapFee) {
-      console.log('Agoric pool, getting spot price');
       const allocation = await E(ammAPI).getPoolAllocation(secondaryBrand);
       const centralAmount = allocation.Central;
       const secondaryAmount = allocation.Secondary;
@@ -126,9 +154,13 @@ const makeAgoricPool = ({
         includeSwapFee ? swapFeeDec : zeroDec,
       );
     },
-    async trade(swapInAmount, expectedReturn) {
+    async sellToken(inAmount, minReturn) {
+      // sell secondary coin
+      const swapInAmount = AmountMath.make(secondaryBrand, inAmount);
+      const swapOutMinAmount = AmountMath.make(centralBrand, minReturn);
+
       const proposal = harden({
-        want: { Out: expectedReturn },
+        want: { Out: swapOutMinAmount },
         give: { In: swapInAmount },
       });
       const invitation = await E(ammAPI).makeSwapInInvitation();
@@ -137,36 +169,40 @@ const makeAgoricPool = ({
       });
 
       console.log(
-        'Offerring a trade',
-        swapInAmount.brand,
-        swapInAmount.value,
-        '==>',
-        expectedReturn.brand,
-        expectedReturn.value,
+        'Agoric: Selling',
+        showAmount(swapInAmount),
+        'With min return',
+        showAmount(swapOutMinAmount),
       );
 
-      let isTradeOk = false;
-      const seatP = E(zoe).offer(invitation, proposal, payments);
+      return makePoolTrade(invitation, proposal, payments);
+    },
+    async buyToken(outAmount, maxSpend) {
+      // buy secondary token
+      const swapInMaxAmount = AmountMath.make(centralBrand, maxSpend);
+      const swapOutAmount = AmountMath.make(secondaryBrand, outAmount);
 
-      const pendingPayments = Promise.all([
-        E(seatP)
-          .getPayout('In')
-          .then((payout) => {
-            return E(fund).deposit(payout);
-          }),
-        E(seatP)
-          .getPayout('Out')
-          .then(async (payout) => {
-            const amount = await E(fund).deposit(payout);
+      const proposal = harden({
+        want: { Out: swapOutAmount },
+        give: { In: swapInMaxAmount },
+      });
+      const invitation = await E(ammAPI).makeSwapOutInvitation();
+      const payments = harden({
+        In: await E(fund).withdraw(swapInMaxAmount),
+      });
 
-            // Swap out amount should not be empty
-            isTradeOk = !AmountMath.isEmpty(amount);
-          }),
-      ]);
+      console.log(
+        'Agoric: Buying',
+        showAmount(swapOutAmount),
+        'With max spend',
+        showAmount(swapInMaxAmount),
+      );
 
-      await E(seatP).getOfferResult();
-      await pendingPayments;
-      return isTradeOk;
+      return makePoolTrade(invitation, proposal, payments);
+    },
+    async shutdown() {
+      console.log('Shutting down Agoric pool');
+      return E(fund).cleanup();
     },
   });
 };
