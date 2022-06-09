@@ -5,6 +5,7 @@ import { Dec } from './math/decimal';
 import { calcSpotPrice } from './math';
 
 const zeroDec = new Dec(0);
+const OSMO_PRECISIONS = 6;
 
 const makeOsmosisPool = async ({
   osmosisClient,
@@ -18,11 +19,11 @@ const makeOsmosisPool = async ({
 
   await E(osmosisClient).initialize();
 
-  let poolData = null;
+  let rawPoolData = null;
 
   const updatePoolData = async () => {
     const data = await E(osmosisClient).getPoolData(poolId);
-    poolData = data.pool;
+    rawPoolData = data.pool;
   };
 
   return Far('Osmosis pool', {
@@ -30,30 +31,41 @@ const makeOsmosisPool = async ({
       return 'Osmosis';
     },
     async getPoolData() {
-      return poolData;
-    },
-    async getSpotPrice(includeSwapFee) {
-      await updatePoolData();
-      const { poolAssets, poolParams } = poolData;
-      const inPoolAsset = poolAssets.find(
+      const { poolAssets, poolParams } = rawPoolData;
+      const centralAsset = poolAssets.find(
         (p) => p.token.denom === centralDenom,
       );
-      const outPoolAsset = poolAssets.find(
+      const secondaryAsset = poolAssets.find(
         (p) => p.token.denom === secondaryDenom,
       );
-
-      assert(inPoolAsset, `Pool asset for ${centralDenom} could not be found`);
+      assert(centralAsset, `Pool asset for ${centralDenom} could not be found`);
       assert(
-        outPoolAsset,
+        secondaryAsset,
         `Pool asset for ${secondaryDenom} could not be found`,
       );
 
+      return {
+        central: {
+          amount: new Dec(centralAsset.token.amount, OSMO_PRECISIONS),
+          weight: new Dec(centralAsset.weight),
+        },
+        secondary: {
+          amount: new Dec(secondaryAsset.token.amount, OSMO_PRECISIONS),
+          weight: new Dec(secondaryAsset.weight),
+        },
+        swapFee: new Dec(poolParams.swapFee),
+      };
+    },
+    async getSpotPrice(includeSwapFee) {
+      await updatePoolData();
+      const poolData = await this.getPoolData();
+
       return calcSpotPrice(
-        new Dec(inPoolAsset.token.amount),
-        new Dec(inPoolAsset.weight),
-        new Dec(outPoolAsset.token.amount),
-        new Dec(outPoolAsset.weight),
-        includeSwapFee ? new Dec(poolParams.swapFee) : zeroDec,
+        poolData.central.amount,
+        poolData.central.weight,
+        poolData.secondary.amount,
+        poolData.secondary.weight,
+        includeSwapFee ? poolData.swapFee : zeroDec,
       );
     },
     async sellToken(inAmount, minReturn) {

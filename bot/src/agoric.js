@@ -6,6 +6,7 @@ import { Dec } from './math/decimal';
 import { calcSpotPrice } from './math';
 
 const BP_PRECISIONS = 4;
+const AGORIC_PRECISIONS = 6;
 const zeroDec = new Dec(0);
 const oneDec = new Dec(1);
 
@@ -138,20 +139,29 @@ const makeAgoricPool = ({
     name() {
       return 'Agoric';
     },
-    async getPoolAllocation() {
-      return E(ammAPI).getPoolAllocation(secondaryBrand);
+    async getPoolData() {
+      const allocation = await E(ammAPI).getPoolAllocation(secondaryBrand);
+      return {
+        central: {
+          amount: new Dec(allocation.Central.value, AGORIC_PRECISIONS),
+          weight: oneDec,
+        },
+        secondary: {
+          amount: new Dec(allocation.Secondary.value, AGORIC_PRECISIONS),
+          weight: oneDec,
+        },
+        swapFee: swapFeeDec,
+      };
     },
     async getSpotPrice(includeSwapFee) {
-      const allocation = await E(ammAPI).getPoolAllocation(secondaryBrand);
-      const centralAmount = allocation.Central;
-      const secondaryAmount = allocation.Secondary;
+      const poolData = await this.getPoolData();
 
       return calcSpotPrice(
-        new Dec(centralAmount.value),
-        oneDec,
-        new Dec(secondaryAmount.value),
-        oneDec,
-        includeSwapFee ? swapFeeDec : zeroDec,
+        poolData.central.amount,
+        poolData.central.weight,
+        poolData.secondary.amount,
+        poolData.secondary.weight,
+        includeSwapFee ? poolData.swapFee : zeroDec,
       );
     },
     async sellToken(inAmount, minReturn) {
@@ -163,10 +173,10 @@ const makeAgoricPool = ({
         want: { Out: swapOutMinAmount },
         give: { In: swapInAmount },
       });
-      const invitation = await E(ammAPI).makeSwapInInvitation();
-      const payments = harden({
-        In: await E(fund).withdraw(swapInAmount),
-      });
+      const [invitation, inPayment] = await Promise.all([
+        E(ammAPI).makeSwapInInvitation(),
+        E(fund).withdraw(swapInAmount),
+      ]);
 
       console.log(
         'Agoric: Selling',
@@ -175,7 +185,13 @@ const makeAgoricPool = ({
         showAmount(swapOutMinAmount),
       );
 
-      return makePoolTrade(invitation, proposal, payments);
+      return makePoolTrade(
+        invitation,
+        proposal,
+        harden({
+          In: inPayment,
+        }),
+      );
     },
     async buyToken(outAmount, maxSpend) {
       // buy secondary token
@@ -186,10 +202,10 @@ const makeAgoricPool = ({
         want: { Out: swapOutAmount },
         give: { In: swapInMaxAmount },
       });
-      const invitation = await E(ammAPI).makeSwapOutInvitation();
-      const payments = harden({
-        In: await E(fund).withdraw(swapInMaxAmount),
-      });
+      const [invitation, inPayment] = await Promise.all([
+        E(ammAPI).makeSwapOutInvitation(),
+        E(fund).withdraw(swapInMaxAmount),
+      ]);
 
       console.log(
         'Agoric: Buying',
@@ -198,7 +214,13 @@ const makeAgoricPool = ({
         showAmount(swapInMaxAmount),
       );
 
-      return makePoolTrade(invitation, proposal, payments);
+      return makePoolTrade(
+        invitation,
+        proposal,
+        harden({
+          In: inPayment,
+        }),
+      );
     },
     async shutdown() {
       console.log('Shutting down Agoric pool');

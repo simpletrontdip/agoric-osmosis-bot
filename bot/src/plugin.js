@@ -93,12 +93,7 @@ export const bootPlugin = () => {
           isOk ? 'succeeded' : 'failed',
           result.transactionHash,
         );
-
-        if (!isOk) {
-          throw Error('Transaction failed');
-        }
-
-        return result;
+        return isOk;
       };
 
       return Far('osmo-client', {

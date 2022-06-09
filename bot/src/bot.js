@@ -2,25 +2,30 @@ import { E } from '@agoric/eventual-send';
 import { Far } from '@agoric/marshal';
 
 import { Dec } from './math/decimal';
-import { makeOsmosisPool } from './osmosis';
+import { calcOptimalTradeAmount } from './math/index.js';
+import { makeOsmosisPool } from './osmosis.js';
 import { makeAgoricFund, makeAgoricPool } from './agoric.js';
 
 const oneDec = new Dec(1);
 const oneHundred = new Dec(100);
-// const oneExp6 = new Dec(1_000_000n);
+const oneExp6 = new Dec(1_000_000n);
 
-const isDebugging = false;
+const isDebugging = true;
 // const AGORIC_AMOUNT_PRECISION = 6;
 
-// const decToMicroNumber = (dec) => {
-//   return BigInt(dec.mul(oneExp6).round().toString());
-// };
+const decToMicroNumber = (dec) => {
+  return BigInt(dec.mul(oneExp6).round().toString());
+};
 
 const startBot = async ({
   timeAuthority,
   checkInterval = 10n,
   maxRunCount = 10,
-  // maxTradeAmount = 10_000_000n,
+  arbitrageOptions = {
+    maxTradeAmount: 1000_000_000n,
+    minTradeAmount: 1_000_000n,
+    smoothTradeRate: new Dec(5, 3),
+  },
   ...args
 }) => {
   const osmosisPool = makeOsmosisPool(args);
@@ -35,19 +40,35 @@ const startBot = async ({
   assert(agoricFund, 'Agoric Fund is required');
 
   let count = 0;
-  const priceDiffThreshold = new Dec(50n, 2); // 0.05% diff
+  const priceDiffThreshold = new Dec(50n, 4); // 0.05% diff
+  const minProfitThreshold = new Dec(50, 2); // 0.5 usdc
+  const smoothTradeRate = arbitrageOptions.smoothTradeRate || new Dec(5, 3); // 0.05
 
   const shutdown = async () => {
     console.log('Shutdown bot');
     return Promise.all([E(agoricPool).shutdown(), E(osmosisPool).shutdown()]);
   };
 
-  const findOptimalSwapAmount = async (osmosisPrice, agoricPrice) => {
+  const findOptimalSwapAmount = async (buyPool, sellPool) => {
     console.log('Finding optimal amount');
-    return {
-      centralAmount: undefined,
-      secondaryAmount: 1000_000_000n,
-    };
+
+    const [buyPoolData, sellPoolData] = await Promise.all([
+      E(buyPool).getPoolData(),
+      E(sellPool).getPoolData(),
+    ]);
+
+    const {
+      central: { amount: cB },
+      secondary: { amount: sB },
+      swapFee: fB,
+    } = buyPoolData;
+    const {
+      central: { amount: cS },
+      secondary: { amount: sS },
+      swapFee: fS,
+    } = sellPoolData;
+
+    return calcOptimalTradeAmount(cB, sB, fB, cS, sS, fS, arbitrageOptions);
   };
 
   const calculateTradeParams = async (osmosisPrice, agoricPrice) => {
@@ -58,6 +79,7 @@ const startBot = async ({
     const shouldTrade = diffRate.abs().gte(priceDiffThreshold);
 
     if (!shouldTrade) {
+      console.log('Price diff is not worth trading');
       return {
         shouldTrade: false,
       };
@@ -67,23 +89,58 @@ const startBot = async ({
     const buyPool = isAgoricCheaper ? agoricPool : osmosisPool;
     const sellPool = isAgoricCheaper ? osmosisPool : agoricPool;
 
-    const { centralAmount, secondaryAmount } = await findOptimalSwapAmount(
-      osmosisPrice,
-      agoricPrice,
+    const solution = await findOptimalSwapAmount(buyPool, sellPool);
+
+    if (!solution) {
+      return {
+        shouldTrade: false,
+      };
+    }
+
+    const {
+      secondaryAmount,
+      centralBuyMaxAmount,
+      centralSellMinAmount,
+      profit,
+    } = solution;
+
+    console.log(
+      'Found a solution =======>',
+      'Token amount',
+      secondaryAmount.toString(4),
+      'Max spend',
+      centralBuyMaxAmount.toString(4),
+      'Min return',
+      centralSellMinAmount.toString(4),
+      'Profit(USD)',
+      profit.toString(4),
     );
+
+    if (profit.lt(minProfitThreshold)) {
+      console.log('Profit might not cover gas fee');
+      return {
+        shouldTrade: false,
+      };
+    }
 
     return {
       shouldTrade: true,
-      centralAmount,
-      secondaryAmount,
+      secondaryAmount: decToMicroNumber(secondaryAmount),
+      centralBuyMaxAmount: decToMicroNumber(
+        centralBuyMaxAmount.mul(oneDec.add(smoothTradeRate)),
+      ),
+      centralSellMinAmount: decToMicroNumber(
+        centralSellMinAmount.mul(oneDec.sub(smoothTradeRate)),
+      ),
       buyPool,
       sellPool,
     };
   };
 
   const doArbitrage = async (
-    centralAmount,
     secondaryAmount,
+    centralBuyMaxAmount,
+    centralSellMinAmount,
     buyPool,
     sellPool,
   ) => {
@@ -92,9 +149,9 @@ const startBot = async ({
     const [buySuccess, sellSuccess] = await Promise.all([
       E(buyPool).buyToken(
         secondaryAmount,
-        centralAmount || 10n * secondaryAmount,
+        centralBuyMaxAmount || 10n * secondaryAmount,
       ),
-      E(sellPool).sellToken(secondaryAmount, centralAmount || 1n),
+      E(sellPool).sellToken(secondaryAmount, centralSellMinAmount || 1n),
     ]);
 
     console.log('Done');
@@ -117,18 +174,25 @@ const startBot = async ({
       agoricPrice.toString(),
     );
 
-    const { shouldTrade, centralAmount, secondaryAmount, buyPool, sellPool } =
-      await calculateTradeParams(osmosisPrice, agoricPrice);
+    const {
+      shouldTrade,
+      secondaryAmount,
+      centralBuyMaxAmount,
+      centralSellMinAmount,
+      buyPool,
+      sellPool,
+    } = await calculateTradeParams(osmosisPrice, agoricPrice);
 
     if (!shouldTrade) {
       // do nothing here
-      console.log('Price diff is not worth trading, ignoring...');
+      console.log('Ignoring...');
       return;
     }
 
     const success = await doArbitrage(
-      centralAmount,
       secondaryAmount,
+      centralBuyMaxAmount,
+      centralSellMinAmount,
       buyPool,
       sellPool,
     );

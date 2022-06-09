@@ -172,6 +172,99 @@ function powInt(base, power) {
   return base.mul(tmp);
 }
 
+export function calcOptimalTradeAmount(cB, sB, fB, cS, sS, fS) {
+  /**
+   * buy side B
+   * cIn = (c * sOut)  / (s - sOut)
+   * (With fee fB)
+   * cIn = (cB * sOut) / (sB - sOut) * (1 + fB)
+   *
+   * sell side S
+   * cOut = (c * sIn) / (s + sIn)
+   * (With fee fS)
+   * cOut = (cS * sIn) / (sS + sIn) * (1 - fS)
+   *
+   * P = cOut - cIn with note that (sOut = sIn = x)
+   * P(x) = (cS * x)(1 - fS)/(sS + x) - (cB * x)(1 + fB)/(sB - x)
+   *
+   * Optimal solution (ask Wolfram Alpha)
+   * x = (+sqrt((-2 cS fS sS sB + 2 cS sS sB + 2 sS cB sB + 2 fB sS cB sB)^2 - 4 (cS fS sS - cS sS + cB sB + fB cB sB) (cS fS sS sB^2 - cS sS sB^2 + sS^2 cB sB + fB sS^2 cB sB)) + 2 cS fS sS sB - 2 cS sS sB - 2 sS cB sB - 2 fB sS cB sB)/(2 (cS fS sS - cS sS + cB sB + fB cB sB))
+   */
+  console.log('Input params', {
+    cB: cB.toString(4),
+    sB: sB.toString(4),
+    fB: fB.toString(4),
+    cS: cS.toString(4),
+    sS: sS.toString(4),
+    fS: fS.toString(4),
+  });
+  // a = (cS fS sS - cS sS + cB sB + fB cB sB)
+  const a = cS
+    .mul(fS)
+    .mul(sS)
+    .sub(cS.mul(sS))
+    .add(cB.mul(sB))
+    .add(fB.mul(cB).mul(sB));
+  // -2 cS fS sS sB + 2 cS sS sB + 2 sS cB sB + 2 fB sS cB sB
+  const b = twoDec
+    .neg()
+    .mul(cS)
+    .mul(fS)
+    .mul(sS)
+    .mul(sB)
+    .add(twoDec.mul(cS).mul(sS).mul(sB))
+    .add(twoDec.mul(sS).mul(cB).mul(sB))
+    .add(twoDec.mul(fB).mul(sS).mul(cB).mul(sB));
+  // c =  (cS fS sS sB^2 - cS sS sB^2 + sS^2 cB sB + fB sS^2 cB sB)
+  const c = cS
+    .mul(fS)
+    .mul(sS)
+    .mul(sB)
+    .mul(sB)
+    .sub(cS.mul(sS).mul(sB).mul(sB))
+    .add(sS.mul(sS).mul(cB).mul(sB))
+    .add(fB.mul(sS).mul(sS).mul(cB).mul(sB));
+
+  const deltaRoot = b.mul(b).sub(new Dec(4n).mul(a).mul(c)).sqrt();
+  // (-b + sqrt(delta))/2a
+  const x = b.neg().add(deltaRoot).quo(twoDec.mul(a));
+
+  const cOut = cS.mul(x).mul(oneDec.sub(fS)).quo(sS.add(x));
+  const cIn = cB.mul(x).mul(oneDec.add(fB)).quo(sB.sub(x));
+
+  // P(x)
+  const profit = cOut.sub(cIn);
+
+  console.log('Math result ===>', {
+    x: x.toString(),
+    profit: profit.toString(),
+    cIn: cIn.toString(),
+    cOut: cOut.toString(),
+  });
+
+  // check conditions
+  const isValid = x.isPositive() && x.lt(sB) && x.lt(sS) && profit.isPositive();
+
+  if (!isValid) {
+    console.log('Could not find valid solution in range');
+    return null;
+  }
+
+  console.log(
+    'Optimal value ====>',
+    x.toString(),
+    'Max profit',
+    profit.toString(),
+  );
+
+  return {
+    secondaryAmount: x,
+    centralBuyMaxAmount: cIn,
+    centralSellMinAmount: cOut,
+    profit,
+  };
+}
+
 export function pow(base, exp) {
   // Exponentiation of a negative base with an arbitrary real exponent is not closed within the reals.
   // You can see this by recalling that `i = (-1)^(.5)`. We have to go to complex numbers to define this.
