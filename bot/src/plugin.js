@@ -99,9 +99,9 @@ export const bootPlugin = () => {
       return Far('osmo-client', {
         initialize,
         getAddress: () => address,
-        async balance() {
+        async balances() {
           assert(osmo, 'Client need to be initalized');
-          return osmo.getBalance(address);
+          return osmo.getAllBalances(address);
         },
         async getPoolData(poolId) {
           assert(poolId, 'Pool id is required');

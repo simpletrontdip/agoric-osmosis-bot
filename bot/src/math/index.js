@@ -2,6 +2,7 @@
 import { Dec } from './decimal.js';
 import { Int } from './int.js';
 
+const isDebugging = false;
 const powPrecision = new Dec('0.00000001');
 const oneDec = new Dec(1);
 const twoDec = new Dec(2);
@@ -256,6 +257,41 @@ export function calcOptimalTradeAmount(cB, sB, fB, cS, sS, fS) {
     'Max profit',
     profit.toString(),
   );
+
+  if (isDebugging) {
+    console.log('Checking relative value');
+    const leftX = x.add(oneDec);
+    const rightX = x.sub(oneDec);
+
+    const leftProfit = cS
+      .mul(leftX)
+      .mul(oneDec.sub(fS))
+      .quo(sS.add(leftX))
+      .sub(cB.mul(leftX).mul(oneDec.add(fB)).quo(sB.sub(leftX)));
+
+    const rightProfit = cS
+      .mul(rightX)
+      .mul(oneDec.sub(fS))
+      .quo(sS.add(rightX))
+      .sub(cB.mul(rightX).mul(oneDec.add(fB)).quo(sB.sub(rightX)));
+
+    console.log(
+      'Try left value ====>',
+      leftX.toString(),
+      'profit',
+      leftProfit.toString(),
+    );
+    console.log(
+      'Try right value ====>',
+      rightX.toString(),
+      'profit',
+      rightProfit.toString(),
+    );
+    assert(
+      profit.gt(leftProfit) && profit.gt(rightProfit),
+      'Something wrong with optimal value',
+    );
+  }
 
   return {
     secondaryAmount: x,

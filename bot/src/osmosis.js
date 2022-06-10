@@ -30,6 +30,18 @@ const makeOsmosisPool = async ({
     name() {
       return 'Osmosis';
     },
+    async balances() {
+      const balances = await E(osmosisClient).balances();
+      const central = balances.find((token) => token.denom === centralDenom);
+      const secondary = balances.find(
+        (token) => token.denom === secondaryDenom,
+      );
+
+      return {
+        central: new Dec(central.amount, OSMO_PRECISIONS),
+        secondary: new Dec(secondary.amount, OSMO_PRECISIONS),
+      };
+    },
     async getPoolData() {
       const { poolAssets, poolParams } = rawPoolData;
       const centralAsset = poolAssets.find(

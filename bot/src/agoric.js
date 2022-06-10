@@ -39,6 +39,16 @@ const makeAgoricFund = ({
   };
 
   return Far('Agoric Bot Fund', {
+    async balances() {
+      const [centralAmount, secondaryAmount] = await Promise.all([
+        E(centralIssuer).getAmountOf(centralFund),
+        E(secondaryIssuer).getAmountOf(secondaryFund),
+      ]);
+      return {
+        centralAmount,
+        secondaryAmount,
+      };
+    },
     async getAmountOf(brand) {
       const isCentral = brand === centralBrand;
       const issuer = isCentral ? centralIssuer : secondaryIssuer;
@@ -139,6 +149,14 @@ const makeAgoricPool = ({
     name() {
       return 'Agoric';
     },
+    async balances() {
+      const { centralAmount, secondaryAmount } = await E(fund).balances();
+      return {
+        central: new Dec(centralAmount.value, AGORIC_PRECISIONS),
+        secondary: new Dec(secondaryAmount.value, AGORIC_PRECISIONS),
+      };
+    },
+
     async getPoolData() {
       const allocation = await E(ammAPI).getPoolAllocation(secondaryBrand);
       return {

@@ -17,15 +17,38 @@ const decToMicroNumber = (dec) => {
   return BigInt(dec.mul(oneExp6).round().toString());
 };
 
+const recordPoolBalances = (pool) => {
+  const oldBalanceP = E(pool).balances();
+
+  return async () => {
+    const oldBalance = await oldBalanceP;
+    const balance = await E(pool).balances();
+
+    return {
+      central: balance.central.sub(oldBalance.central),
+      secondary: balance.secondary.sub(oldBalance.secondary),
+    };
+  };
+};
+
+const showBalancesDiff =
+  (name) =>
+  ({ central, secondary }) => {
+    console.log(
+      '===>',
+      name,
+      'Balances diff: central',
+      central.toString(4),
+      'secondary',
+      secondary.toString(4),
+    );
+  };
+
 const startBot = async ({
   timeAuthority,
   checkInterval = 10n,
   maxRunCount = 10,
-  arbitrageOptions = {
-    maxTradeAmount: 1000_000_000n,
-    minTradeAmount: 1_000_000n,
-    smoothTradeRate: new Dec(5, 3),
-  },
+  arbitrageOptions = {},
   ...args
 }) => {
   const osmosisPool = makeOsmosisPool(args);
@@ -43,9 +66,26 @@ const startBot = async ({
   const priceDiffThreshold = new Dec(50n, 4); // 0.05% diff
   const minProfitThreshold = new Dec(50, 2); // 0.5 usdc
   const smoothTradeRate = arbitrageOptions.smoothTradeRate || new Dec(5, 3); // 0.05
+  // const maxTradeAmount = arbitrageOptions.maxTradeAmount || new Dec(1_000n); // 1_000 osmo
+  // const minTradeAmount = arbitrageOptions.minTradeAmount || new Dec(10n); // 1 osmo
+
+  const agoricBalancesCheck = recordPoolBalances(agoricPool);
+  const osmosisBalancesCheck = recordPoolBalances(osmosisPool);
+
+  const checkBalancesDiff = async () => {
+    console.log('Checking pools balances diff');
+
+    return Promise.all([
+      agoricBalancesCheck().then(showBalancesDiff('Agoric')),
+      osmosisBalancesCheck().then(showBalancesDiff('Osmosis')),
+    ]);
+  };
 
   const shutdown = async () => {
     console.log('Shutdown bot');
+
+    await checkBalancesDiff();
+
     return Promise.all([E(agoricPool).shutdown(), E(osmosisPool).shutdown()]);
   };
 
