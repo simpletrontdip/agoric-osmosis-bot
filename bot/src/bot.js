@@ -10,7 +10,7 @@ const oneDec = new Dec(1);
 const oneHundred = new Dec(100);
 const oneExp6 = new Dec(1_000_000n);
 
-const isDebugging = false;
+const isDebugging = true;
 
 const decToMicroNumber = (dec) => {
   return BigInt(dec.mul(oneExp6).round().toString());
@@ -167,6 +167,13 @@ const startBot = async ({
         shouldTrade: false,
       };
     }
+
+    console.log(
+      'Buy on',
+      isAgoricCheaper ? 'Agoric' : 'Osmosis',
+      'Sell on',
+      isAgoricCheaper ? 'Osmosis' : 'Agoric',
+    );
 
     return {
       shouldTrade: true,

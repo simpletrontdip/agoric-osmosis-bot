@@ -15,11 +15,11 @@ const arbitrage = harden({
     fund: {
       Central: {
         purse: 'Agoric RUN currency',
-        amount: 1_000_000_000_000n,
+        amount: 100_000_000_000_000n,
       },
       Secondary: {
         purse: 'OSMO to arbitrage',
-        ammount: 1_000_000_000_000n,
+        ammount: 100_000_000_000_000n,
       },
     },
     pool: {
