@@ -42,6 +42,7 @@ const showBalancesDiff =
       'secondary',
       secondary.toString(4),
     );
+    return { central, secondary };
   };
 
 const startBot = async ({
@@ -78,7 +79,12 @@ const startBot = async ({
     return Promise.all([
       agoricBalancesCheck().then(showBalancesDiff('Agoric')),
       osmosisBalancesCheck().then(showBalancesDiff('Osmosis')),
-    ]);
+    ])
+      .then(([agDiff, osmoDiff]) => ({
+        central: agDiff.central.add(osmoDiff.central),
+        secondary: agDiff.secondary.add(osmoDiff.secondary),
+      }))
+      .then(showBalancesDiff('Total'));
   };
 
   const shutdown = async () => {
