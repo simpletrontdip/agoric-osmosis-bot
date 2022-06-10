@@ -251,12 +251,7 @@ export function calcOptimalTradeAmount(cB, sB, fB, cS, sS, fS) {
     return null;
   }
 
-  console.log(
-    'Optimal value ====>',
-    x.toString(),
-    'Max profit',
-    profit.toString(),
-  );
+  console.log('Optimal value in range found');
 
   if (isDebugging) {
     console.log('Checking relative value');

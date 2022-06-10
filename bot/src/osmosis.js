@@ -68,7 +68,7 @@ const makeOsmosisPool = async ({
         swapFee: new Dec(poolParams.swapFee),
       };
     },
-    async getSpotPrice(includeSwapFee) {
+    async getSpotPrice(includeSwapFee = true) {
       await updatePoolData();
       const poolData = await this.getPoolData();
 

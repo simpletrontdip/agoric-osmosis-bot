@@ -10,8 +10,7 @@ const oneDec = new Dec(1);
 const oneHundred = new Dec(100);
 const oneExp6 = new Dec(1_000_000n);
 
-const isDebugging = true;
-// const AGORIC_AMOUNT_PRECISION = 6;
+const isDebugging = false;
 
 const decToMicroNumber = (dec) => {
   return BigInt(dec.mul(oneExp6).round().toString());
@@ -48,7 +47,7 @@ const showBalancesDiff =
 const startBot = async ({
   timeAuthority,
   checkInterval = 10n,
-  maxRunCount = 10,
+  maxRunCount = 3,
   arbitrageOptions = {},
   ...args
 }) => {
@@ -154,9 +153,9 @@ const startBot = async ({
       'Found a solution =======>',
       'Token amount',
       secondaryAmount.toString(4),
-      'Max spend',
+      'Max-spend',
       centralBuyMaxAmount.toString(4),
-      'Min return',
+      'Min-return',
       centralSellMinAmount.toString(4),
       'Profit(USD)',
       profit.toString(4),
@@ -200,7 +199,7 @@ const startBot = async ({
       E(sellPool).sellToken(secondaryAmount, centralSellMinAmount || 1n),
     ]);
 
-    console.log('Done');
+    console.log('Done', { buySuccess, sellSuccess });
     return buySuccess && sellSuccess;
   };
 

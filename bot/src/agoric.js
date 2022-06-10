@@ -171,7 +171,7 @@ const makeAgoricPool = ({
         swapFee: swapFeeDec,
       };
     },
-    async getSpotPrice(includeSwapFee) {
+    async getSpotPrice(includeSwapFee = true) {
       const poolData = await this.getPoolData();
 
       return calcSpotPrice(
