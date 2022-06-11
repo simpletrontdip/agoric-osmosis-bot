@@ -188,52 +188,76 @@ export function calcOptimalTradeAmount(cB, sB, fB, cS, sS, fS) {
    * P = cOut - cIn with note that (sOut = sIn = x)
    * P(x) = (cS * x)(1 - fS)/(sS + x) - (cB * x)(1 + fB)/(sB - x)
    *
-   * Optimal solution (ask Wolfram Alpha)
-   * x = (+sqrt((-2 cS fS sS sB + 2 cS sS sB + 2 sS cB sB + 2 fB sS cB sB)^2 - 4 (cS fS sS - cS sS + cB sB + fB cB sB) (cS fS sS sB^2 - cS sS sB^2 + sS^2 cB sB + fB sS^2 cB sB)) + 2 cS fS sS sB - 2 cS sS sB - 2 sS cB sB - 2 fB sS cB sB)/(2 (cS fS sS - cS sS + cB sB + fB cB sB))
-   */
-  console.log('Input params', {
-    cB: cB.toString(4),
-    sB: sB.toString(4),
-    fB: fB.toString(4),
-    cS: cS.toString(4),
-    sS: sS.toString(4),
-    fS: fS.toString(4),
-  });
-  // a = (cS fS sS - cS sS + cB sB + fB cB sB)
-  const a = cS
-    .mul(fS)
-    .mul(sS)
-    .sub(cS.mul(sS))
-    .add(cB.mul(sB))
-    .add(fB.mul(cB).mul(sB));
-  // -2 cS fS sS sB + 2 cS sS sB + 2 sS cB sB + 2 fB sS cB sB
-  const b = twoDec
-    .neg()
-    .mul(cS)
-    .mul(fS)
-    .mul(sS)
-    .mul(sB)
-    .add(twoDec.mul(cS).mul(sS).mul(sB))
-    .add(twoDec.mul(sS).mul(cB).mul(sB))
-    .add(twoDec.mul(fB).mul(sS).mul(cB).mul(sB));
-  // c =  (cS fS sS sB^2 - cS sS sB^2 + sS^2 cB sB + fB sS^2 cB sB)
-  const c = cS
-    .mul(fS)
-    .mul(sS)
-    .mul(sB)
-    .mul(sB)
-    .sub(cS.mul(sS).mul(sB).mul(sB))
-    .add(sS.mul(sS).mul(cB).mul(sB))
-    .add(fB.mul(sS).mul(sS).mul(cB).mul(sB));
+   * a = cS
+   * b = 1 - fS
+   * c = sS
+   *
+   * d = cB
+   * e = 1 + fB
+   * f = sB
+   *
+   * P(x) = (a b x)/(c + x) - (d e x)/(f - x)
+   *
+   * m = ab
+   * k = de
+   *
+   * P(x) = mx/(c+x) - kx/(f-x)
+   *
+   * P'(x) = (cm)/(c+x)^2 - (fk)/(f-x)^2
+   *
+   * A = cm
+   * B = fk
+   *
+   * P'(x) = A/(c+x)^2 - B/(f-x)^2 = 0
+   *
+   * x = (sqrt(AB) (c + f) + A f + B c)/(A - B)
+   * x = (-sqrt(AB) (c + f) + A f + B c)/(A - B)
+   *
+   * solve with f > x > 0
+   *
+   * cOut = mx/(c+x)
+   * cIn = kx/(f-x)
+   *
+   * */
 
-  const deltaRoot = b.mul(b).sub(new Dec(4n).mul(a).mul(c)).sqrt();
-  // (-b + sqrt(delta))/2a
-  const x = b.neg().add(deltaRoot).quo(twoDec.mul(a));
+  const a = cS;
+  const b = oneDec.sub(fS);
+  const c = sS;
+  const d = cB;
+  const e = oneDec.add(fB);
+  const f = sB;
 
-  const cOut = cS.mul(x).mul(oneDec.sub(fS)).quo(sS.add(x));
-  const cIn = cB.mul(x).mul(oneDec.add(fB)).quo(sB.sub(x));
+  const k = d.mul(e);
+  const m = a.mul(b);
 
-  // P(x)
+  const A = c.mul(m);
+  const B = f.mul(k);
+
+  const sAB = A.sub(B);
+  const rAB = A.mul(B).sqrt();
+  const cBfA = c.mul(B).add(f.mul(A));
+  const cf = c.add(f);
+
+  const x1 = rAB.mul(cf).add(cBfA).quo(sAB);
+  const x2 = rAB.neg().mul(cf).add(cBfA).quo(sAB);
+
+  console.log('Trying 2 values', x1.toString(4), x2.toString(4));
+
+  let x = null;
+
+  if (x1.isPositive() && x1.lt(f)) {
+    x = x1;
+  } else if (x2.isPositive() && x2.lt(f)) {
+    x = x2;
+  }
+
+  if (!x) {
+    console.log('Could not find a valid solution');
+    return null;
+  }
+
+  const cOut = m.mul(x).quo(c.add(x));
+  const cIn = k.mul(x).quo(f.sub(x));
   const profit = cOut.sub(cIn);
 
   console.log('Math result ===>', {
@@ -243,14 +267,6 @@ export function calcOptimalTradeAmount(cB, sB, fB, cS, sS, fS) {
     cOut: cOut.toString(),
   });
 
-  // check conditions
-  const isValid = x.isPositive() && x.lt(sB) && x.lt(sS) && profit.isPositive();
-
-  if (!isValid) {
-    console.log('Could not find valid solution in range');
-    return null;
-  }
-
   console.log('Optimal value in range found');
 
   if (isDebugging) {
@@ -258,17 +274,15 @@ export function calcOptimalTradeAmount(cB, sB, fB, cS, sS, fS) {
     const leftX = x.add(oneDec);
     const rightX = x.sub(oneDec);
 
-    const leftProfit = cS
+    const leftProfit = m
       .mul(leftX)
-      .mul(oneDec.sub(fS))
-      .quo(sS.add(leftX))
-      .sub(cB.mul(leftX).mul(oneDec.add(fB)).quo(sB.sub(leftX)));
+      .quo(c.add(leftX))
+      .sub(k.mul(leftX).quo(f.sub(leftX)));
 
-    const rightProfit = cS
+    const rightProfit = m
       .mul(rightX)
-      .mul(oneDec.sub(fS))
-      .quo(sS.add(rightX))
-      .sub(cB.mul(rightX).mul(oneDec.add(fB)).quo(sB.sub(rightX)));
+      .quo(c.add(rightX))
+      .sub(k.mul(rightX).quo(f.sub(rightX)));
 
     console.log(
       'Try left value ====>',
