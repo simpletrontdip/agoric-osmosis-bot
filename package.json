@@ -7,7 +7,6 @@
     "node": ">=14.15.0"
   },
   "workspaces": [
-    "ui",
     "bot",
     "_agstate/agoric-servers"
   ],
